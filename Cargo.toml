@@ -23,3 +23,8 @@ bytemuck = { version = "1.17.0", features = ["derive"] }
 notify = { version = "6.1.1" }
 notify-debouncer-mini = "0.4.1"
 slotmap = "1.0.7"
+
+[dev-dependencies]
+
+[[example]]
+name = "basic"

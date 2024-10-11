@@ -58,7 +58,7 @@ impl App {
         let start_time = SystemTime::now();
 
         let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build().expect("Failed to create event loop.");
-        let window = Window::create(&event_loop, "kiyo engine", app_config.width, app_config.height);
+        let window = Window::create(&event_loop, "cen", app_config.width, app_config.height);
         let renderer = Renderer::new(&window, event_loop.create_proxy(), app_config.vsync);
 
         App {
