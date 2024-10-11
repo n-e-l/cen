@@ -3,6 +3,8 @@
 [![crate](https://img.shields.io/crates/v/kiyo)](https://crates.io/crates/cen/)  
 
 ## What is Cen?
+Cen is currently undergoing restructuring after migrating from [kiyo](https://github.com/angelocarly/kiyo).
+
 A lightweight vulkan window backend using [ash](https://github.com/ash-rs/ash).
 
 ## Building & running
