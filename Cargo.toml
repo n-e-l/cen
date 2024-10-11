@@ -1,13 +1,13 @@
 [package]
-name = "kiyo"
-version = "0.0.4"
+name = "cen"
+version = "0.0.1"
 edition = "2021"
 authors = ["Angelo Carly <angelo.carly@protonmail.com"]
 description = "Lightweight compute shader playground"
 readme = "README.md"
-repository = "https://github.com/angelocarly/kiyo"
-license = "GPL-3.0-only"
-keywords = ["compute", "vulkan", "render", "engine", "art"]
+repository = "https://github.com/angelocarly/cen"
+license = "MIT"
+keywords = ["vulkan", "render", "engine"]
 categories = ["rendering::engine"]
 
 [dependencies]
@@ -24,20 +24,3 @@ bytemuck = { version = "1.17.0", features = ["derive"] }
 notify = { version = "6.1.1" }
 notify-debouncer-mini = "0.4.1"
 slotmap = "1.0.7"
-
-[dev-dependencies]
-
-[[example]]
-name = "simple-render"
-
-[[example]]
-name = "blur-pass"
-
-[[example]]
-name = "with-audio"
-
-[[example]]
-name = "clear"
-
-[[example]]
-name = "feedback"
