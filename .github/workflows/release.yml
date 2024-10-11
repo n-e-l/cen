@@ -18,9 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Install alsa
-        run: sudo apt-get install -y librust-alsa-sys-dev
-        
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         
