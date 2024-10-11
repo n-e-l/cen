@@ -1,4 +1,4 @@
-# Kiyo
+# Cen
 ![build](https://github.com/angelocarly/cen/actions/workflows/rust.yml/badge.svg)
 [![crate](https://img.shields.io/crates/v/kiyo)](https://crates.io/crates/cen/)  
 
