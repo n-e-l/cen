@@ -1,7 +1,6 @@
 use std::time::Instant;
 use ash::vk;
 use ash::vk::{FenceCreateFlags, ImageAspectFlags, PhysicalDevice, Queue};
-use bytemuck::{Pod, Zeroable};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
 use crate::app::{Window};
@@ -31,14 +30,6 @@ pub struct Renderer {
     pub instance: Instance,
     pub proxy: EventLoopProxy<UserEvent>,
     pub start_time: Instant,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Pod, Zeroable)]
-pub struct PushConstants {
-    pub time: f32,
-    pub in_image: i32,
-    pub out_image: i32,
 }
 
 impl Renderer {

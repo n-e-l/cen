@@ -55,6 +55,7 @@ impl PipelineStore {
         }))
     }
 
+    #[warn(dead_code)]
     pub fn get(&self, key: DefaultKey) -> Option<ComputePipeline> {
         self.inner.lock().unwrap().pipelines.get(key).map(|p| p.pipeline.clone())
     }

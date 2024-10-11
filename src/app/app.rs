@@ -1,19 +1,15 @@
-use crate::app::StreamFactory;
-use crate::app::draw_orch::{DrawConfig};
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::time::{Duration, SystemTime};
 use env_logger::{Builder, Env};
-use glam::UVec2;
 use log::{debug, error, info, LevelFilter};
-use notify::RecursiveMode;
 use notify_debouncer_mini::DebouncedEventKind::Any;
 use notify_debouncer_mini::DebounceEventResult;
 use winit::event::{Event, StartCause, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
-use cpal::traits::StreamTrait;
-use crate::app::{DrawOrchestrator, Window};
+use crate::app::{Window};
 use crate::graphics::Renderer;
+use crate::graphics::renderer::RenderComponent;
 
 pub struct App {
     _start_time: SystemTime,
@@ -93,54 +89,19 @@ impl App {
         }
     }
 
-    pub fn run(mut self, draw_config: DrawConfig, audio_func: Option<fn(f32)->(f32, f32)>) {
+    pub fn run(mut self, component: &dyn RenderComponent) {
 
         // Register file watching for the shaders
-        let mut watcher = notify_debouncer_mini::new_debouncer(
+        let _watcher = notify_debouncer_mini::new_debouncer(
             Duration::from_millis(250),
             Self::watch_callback(self.event_loop.create_proxy())
         ).expect("Failed to create file watcher");
 
-        let paths = &draw_config.passes.iter().map(|p| { p.shader.clone() }).collect::<Vec<String>>();
+        // TODO: Watch created shaders
+        /*let paths = &draw_config.passes.iter().map(|p| { p.shader.clone() }).collect::<Vec<String>>();
         for path in paths {
             watcher.watcher().watch(Path::new(path), RecursiveMode::Recursive).unwrap();
-        }
-
-        // Parse orchestrator
-        let resolution = UVec2::new( self.window.get_extent().width, self.window.get_extent().height );
-        let mut orchestrator = match DrawOrchestrator::new(&mut self.renderer, resolution, &draw_config) {
-            Ok(d) => {
-                d
-            },
-            Err(e) => {
-                error!("{}", e);
-                info!("A shader contains an error, quitting");
-                std::process::abort();
-            }
-        };
-
-        // audio
-
-        if let Some(audio_func) = audio_func {
-
-            let sf = StreamFactory::default_factory().unwrap();
-
-            let sample_rate = sf.config().sample_rate.0;
-            let mut sample_clock = 0;
-            let routin = move |len: usize| -> Vec<f32> {
-                (0..len / 2) // len is apparently left *and* right
-                    .flat_map(|_| {
-                        sample_clock = (sample_clock + 1) % sample_rate;
-
-                        let (l, r) = audio_func(sample_clock as f32 / sample_rate as f32);
-                        vec![l, r]
-                    })
-                    .collect()
-            };
-
-            let stream = sf.create_stream(routin).unwrap();
-            StreamTrait::play(&stream).unwrap();
-        }
+        }*/
 
         // Event loop
 
@@ -152,7 +113,7 @@ impl App {
 
                 match event {
                     | Event::NewEvents(StartCause::Poll) => {
-                        self.renderer.draw_frame(&mut orchestrator);
+                        self.renderer.draw_frame(component);
 
                         if self.app_config.log_fps {
                             let current_frame_time = SystemTime::now();
@@ -171,7 +132,7 @@ impl App {
 
                         match event {
                             WindowEvent::RedrawRequested => {
-                                self.renderer.draw_frame(&mut orchestrator);
+                                self.renderer.draw_frame(component);
                             },
                             WindowEvent::Resized( _ ) => {
                             }
