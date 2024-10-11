@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.3](https://github.com/angelocarly/cen/compare/v0.0.2...v0.0.3) - 2024-10-11
+
+### Other
+
+- Remove kiyo specific code
+
 ## [0.0.4](https://github.com/angelocarly/kiyo/compare/v0.0.3...v0.0.4) - 2024-08-17
 
 ### Other
