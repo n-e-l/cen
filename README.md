@@ -39,7 +39,6 @@ Then you should be able to launch your cen application and capture a frame.
 ## References
 - [myndgera](https://github.com/pudnax/myndgera) - Pipeline caching and reloading
 - [paya](https://github.com/paratym/paya) - Vulkan memory dependencies and ash wrappers
-- [sound-shader](https://github.com/ytanimura/sound-shader) - Cpal wrapper code and shader audio inspiration
 
 ## Libraries
 - [ash](https://github.com/ash-rs/ash) - Vulkan bindings
