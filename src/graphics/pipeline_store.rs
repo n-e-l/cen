@@ -1,10 +1,15 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use ash::vk;
-
+use log::error;
+use notify::{RecommendedWatcher, RecursiveMode};
+use notify_debouncer_mini::{DebounceEventResult, Debouncer};
+use notify_debouncer_mini::DebouncedEventKind::Any;
 use slotmap::{DefaultKey, SlotMap};
-
+use winit::event_loop::{EventLoopProxy};
+use crate::app::app::UserEvent;
 use crate::vulkan::{ComputePipeline, DescriptorSetLayout, Device, PipelineErr};
 
 pub struct PipelineConfig {
@@ -22,6 +27,7 @@ struct PipelineHandle {
 struct PipelineStoreInner {
     device: Device,
     pipelines: SlotMap<DefaultKey, PipelineHandle>,
+    watcher: Debouncer<RecommendedWatcher>,
 }
 
 pub struct PipelineStore {
@@ -29,18 +35,48 @@ pub struct PipelineStore {
 }
 
 impl PipelineStore {
-    pub fn new(device: &Device) -> PipelineStore {
+    pub fn new(device: &Device, proxy: EventLoopProxy<UserEvent>) -> PipelineStore {
+
+        // Register file watching for the shaders
+        let watcher = notify_debouncer_mini::new_debouncer(
+            Duration::from_millis(250),
+            Self::watch_callback(proxy)
+        ).expect("Failed to create file watcher");
 
         PipelineStore {
             inner: Arc::new(Mutex::new(PipelineStoreInner{
+                watcher,
                 device: device.clone(),
                 pipelines: SlotMap::new(),
             }))
         }
     }
 
+    fn watch_callback(event_loop_proxy: EventLoopProxy<UserEvent>) -> impl FnMut(DebounceEventResult) {
+        move |event| match event {
+            Ok(events) => {
+                if let Some(e) = events
+                    .iter()
+                    .filter(|e| e.kind == Any)
+                    .next()
+                {
+                    event_loop_proxy.send_event(
+                        UserEvent::GlslUpdate(e.path.clone())
+                    ).expect("Failed to send event")
+                }
+            }
+            Err(e) => {
+                error!("{}", e);
+            }
+        }
+    }
+
     pub fn insert(&mut self, config: PipelineConfig) -> Result<DefaultKey, PipelineErr> {
         let mut inner = self.inner.lock().unwrap();
+
+        // Watch for file changes
+        inner.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
+
         let pipeline = ComputePipeline::new(
             &inner.device,
             config.shader_path.clone(),
@@ -81,4 +117,5 @@ impl PipelineStore {
 
         Ok(())
     }
+
 }

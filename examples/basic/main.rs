@@ -5,11 +5,10 @@ use cen::graphics::renderer::RenderComponent;
 use cen::vulkan::CommandBuffer;
 
 struct BasicRend {
-
 }
 
 impl RenderComponent for BasicRend {
-    fn render(&self, renderer: &Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &Image) {
+    fn render(&self, _: &mut Renderer, _: &mut CommandBuffer, _: &Image) {
     }
 }
 
@@ -23,6 +22,5 @@ fn main() {
     });
 
     let render_comp = BasicRend {};
-
-    app.run(&render_comp);
+    app.run(Box::new(render_comp));
 }

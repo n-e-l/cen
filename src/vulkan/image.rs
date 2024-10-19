@@ -26,7 +26,9 @@ impl Drop for Image {
             self.device_dep.device.destroy_sampler(self.sampler, None);
             self.device_dep.device.destroy_image_view(self.image_view, None);
             if let Some(allocation) = self.allocation.take() {
+                let memory_addr = format!("{:?}, {:?}", allocation.memory(), allocation.chunk_id());
                 self.allocator_dep.lock().unwrap().allocator.free(allocation).unwrap();
+                trace!(target: LOG_TARGET, "Destroyed image memory: [{}]", memory_addr)
             }
             self.device_dep.device.destroy_image(self.image, None);
             trace!(target: LOG_TARGET, "Destroyed image: [{}]", image_addr)

@@ -9,7 +9,7 @@ use crate::graphics::pipeline_store::PipelineStore;
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain};
 
 pub trait RenderComponent {
-    fn render(&self, renderer: &Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image);
+    fn render(&self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image);
 }
 
 pub struct Renderer {
@@ -42,14 +42,17 @@ impl Renderer {
         let queue = device.get_queue(0);
         let command_pool = CommandPool::new(&device, queue_family_index);
 
-        let allocator = Allocator::new(&AllocatorCreateDesc {
-            instance: instance.handle().clone(),
-            device: device.handle().clone(),
-            physical_device,
-            debug_settings: Default::default(),
-            buffer_device_address: false,  // Ideally, check the BufferDeviceAddressFeatures struct.
-            allocation_sizes: Default::default(),
-        });
+        let allocator = Allocator::new(
+            &device,
+            &AllocatorCreateDesc {
+                instance: instance.handle().clone(),
+                device: device.handle().clone(),
+                physical_device,
+                debug_settings: Default::default(),
+                buffer_device_address: false,  // Ideally, check the BufferDeviceAddressFeatures struct.
+                allocation_sizes: Default::default(),
+            }
+        );
 
         let present_mode = if vsync {
             vk::PresentModeKHR::FIFO
@@ -84,7 +87,7 @@ impl Renderer {
             }
         }).collect::<Vec<vk::Fence>>();
 
-        let pipeline_store = PipelineStore::new( &device );
+        let pipeline_store = PipelineStore::new( &device, proxy.clone() );
 
         let start_time = std::time::Instant::now();
 
@@ -223,6 +226,10 @@ impl Renderer {
         );
 
         self.frame_index = ( self.frame_index + 1 ) % self.swapchain.get_image_views().len();
+    }
+
+    pub fn pipeline_store(&mut self) -> &mut PipelineStore {
+        &mut self.pipeline_store
     }
 }
 

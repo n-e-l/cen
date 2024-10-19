@@ -4,9 +4,11 @@ use ash::vk;
 use ash::vk::{PipelineStageFlags, Queue};
 use log::trace;
 use crate::vulkan::{CommandBuffer, Instance, LOG_TARGET};
+use crate::vulkan::instance::InstanceInner;
 
 /// A connection to a physical GPU.
 pub struct DeviceInner {
+    pub instance_dep: Arc<InstanceInner>,
     pub device: ash::Device,
     pub device_push_descriptor: ash::khr::push_descriptor::Device,
     pub queue_family_index: u32,
@@ -64,6 +66,7 @@ impl Device {
         let device_push_descriptor = ash::khr::push_descriptor::Device::new(instance.handle(), &device);
 
         let device_inner = DeviceInner {
+            instance_dep: instance.inner.clone(),
             device,
             device_push_descriptor,
             queue_family_index,

@@ -89,7 +89,7 @@ impl App {
         }
     }
 
-    pub fn run(mut self, component: &dyn RenderComponent) {
+    pub fn run(mut self, component: Box<dyn RenderComponent>) {
 
         // Register file watching for the shaders
         let _watcher = notify_debouncer_mini::new_debouncer(
@@ -113,7 +113,7 @@ impl App {
 
                 match event {
                     | Event::NewEvents(StartCause::Poll) => {
-                        self.renderer.draw_frame(component);
+                        self.renderer.draw_frame(component.as_ref());
 
                         if self.app_config.log_fps {
                             let current_frame_time = SystemTime::now();
@@ -132,7 +132,7 @@ impl App {
 
                         match event {
                             WindowEvent::RedrawRequested => {
-                                self.renderer.draw_frame(component);
+                                self.renderer.draw_frame(component.as_ref());
                             },
                             WindowEvent::Resized( _ ) => {
                             }
@@ -155,5 +155,13 @@ impl App {
         // Wait for all render operations to finish before exiting
         // This ensures we can safely start dropping gpu resources
         self.renderer.device.wait_idle();
+    }
+
+    pub fn renderer(&mut self) -> &mut Renderer {
+        &mut self.renderer
+    }
+
+    pub fn window(&mut self) -> &mut Window {
+        &mut self.window
     }
 }
