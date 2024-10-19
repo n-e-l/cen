@@ -5,6 +5,7 @@
 A lightweight vulkan window backend using [ash](https://github.com/ash-rs/ash).
 
 Cen aims to provide abstractions around Vulkan handles and window management. Current features include:
+- Winit-backed window setup
 - Vulkan wrappers with memory dependencies
 - Hot-swappable shader storage, compiled at runtime
 
