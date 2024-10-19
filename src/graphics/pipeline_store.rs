@@ -7,7 +7,7 @@ use log::error;
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer};
 use notify_debouncer_mini::DebouncedEventKind::Any;
-use slotmap::{DefaultKey, SlotMap};
+use slotmap::{new_key_type, SlotMap};
 use winit::event_loop::{EventLoopProxy};
 use crate::app::app::UserEvent;
 use crate::vulkan::{ComputePipeline, DescriptorSetLayout, Device, PipelineErr};
@@ -19,6 +19,8 @@ pub struct PipelineConfig {
     pub macros: HashMap<String, String>,
 }
 
+new_key_type! { pub struct PipelineKey; }
+
 struct PipelineHandle {
     config: PipelineConfig,
     pipeline: ComputePipeline,
@@ -26,7 +28,7 @@ struct PipelineHandle {
 
 struct PipelineStoreInner {
     device: Device,
-    pipelines: SlotMap<DefaultKey, PipelineHandle>,
+    pipelines: SlotMap<PipelineKey, PipelineHandle>,
     watcher: Debouncer<RecommendedWatcher>,
 }
 
@@ -47,7 +49,7 @@ impl PipelineStore {
             inner: Arc::new(Mutex::new(PipelineStoreInner{
                 watcher,
                 device: device.clone(),
-                pipelines: SlotMap::new(),
+                pipelines: SlotMap::with_key(),
             }))
         }
     }
@@ -71,7 +73,7 @@ impl PipelineStore {
         }
     }
 
-    pub fn insert(&mut self, config: PipelineConfig) -> Result<DefaultKey, PipelineErr> {
+    pub fn insert(&mut self, config: PipelineConfig) -> Result<PipelineKey, PipelineErr> {
         let mut inner = self.inner.lock().unwrap();
 
         // Watch for file changes
@@ -92,7 +94,7 @@ impl PipelineStore {
     }
 
     #[warn(dead_code)]
-    pub fn get(&self, key: DefaultKey) -> Option<ComputePipeline> {
+    pub fn get(&self, key: PipelineKey) -> Option<ComputePipeline> {
         self.inner.lock().unwrap().pipelines.get(key).map(|p| p.pipeline.clone())
     }
 
