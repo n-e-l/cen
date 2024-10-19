@@ -2,10 +2,11 @@
 ![build](https://github.com/angelocarly/cen/actions/workflows/rust.yml/badge.svg)
 [![crate](https://img.shields.io/crates/v/cen)](https://crates.io/crates/cen/)  
 
-## What is Cen?
-Cen is currently undergoing restructuring after migrating from [kiyo](https://github.com/angelocarly/kiyo).
-
 A lightweight vulkan window backend using [ash](https://github.com/ash-rs/ash).
+
+Cen aims to provide abstractions around Vulkan handles and window management. Current features include:
+- Vulkan wrappers with memory dependencies
+- Hot-swappable shader storage, compiled at runtime
 
 ## Building & running
 
@@ -14,8 +15,7 @@ Then build and run `cen` examples:
 ```
 git clone https://github.com/angelocarly/cen.git
 cd cen
-# TODO: There are no examples yet
-cargo run --example simple-render
+cargo run --example basic
 ```
 
 ## GPU debugging
