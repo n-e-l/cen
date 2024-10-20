@@ -137,7 +137,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn bind_push_descriptor(&self, pipeline: &dyn Pipeline, set: u32, write_descriptor_set: WriteDescriptorSet) {
+    pub fn bind_push_descriptor(&self, pipeline: &dyn Pipeline, set: u32, write_descriptor_sets: &[WriteDescriptorSet]) {
         let inner = self.inner();
         unsafe {
             inner.device_dep.device_push_descriptor.cmd_push_descriptor_set(
@@ -145,7 +145,7 @@ impl CommandBuffer {
                 pipeline.bind_point(),
                 pipeline.layout(),
                 set,
-                &[write_descriptor_set]
+                write_descriptor_sets
             );
         }
     }
