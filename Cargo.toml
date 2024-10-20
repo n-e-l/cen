@@ -28,3 +28,6 @@ slotmap = "1.0.7"
 
 [[example]]
 name = "empty"
+
+[[example]]
+name = "compute"
