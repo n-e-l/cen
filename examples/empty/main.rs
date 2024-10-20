@@ -4,10 +4,10 @@ use cen::graphics::{Renderer};
 use cen::graphics::renderer::RenderComponent;
 use cen::vulkan::CommandBuffer;
 
-struct BasicRend {
+struct EmptyRend {
 }
 
-impl RenderComponent for BasicRend {
+impl RenderComponent for EmptyRend {
     fn render(&self, _: &mut Renderer, _: &mut CommandBuffer, _: &Image) {
     }
 }
@@ -21,6 +21,6 @@ fn main() {
         log_fps: false,
     });
 
-    let render_comp = BasicRend {};
+    let render_comp = EmptyRend {};
     app.run(Box::new(render_comp));
 }
