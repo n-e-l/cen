@@ -122,7 +122,7 @@ impl Image {
         }
     }
 
-    fn binding(&self, layout: vk::ImageLayout) -> vk::DescriptorImageInfo {
+    pub fn binding(&self, layout: vk::ImageLayout) -> vk::DescriptorImageInfo {
        vk::DescriptorImageInfo::default()
             .image_layout(layout)
             .image_view(self.image_view)
