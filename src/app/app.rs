@@ -89,7 +89,7 @@ impl App {
         }
     }
 
-    pub fn run(mut self, component: Box<dyn RenderComponent>) {
+    pub fn run(&mut self, component: &dyn RenderComponent) {
 
         // Register file watching for the shaders
         let _watcher = notify_debouncer_mini::new_debouncer(
@@ -113,7 +113,7 @@ impl App {
 
                 match event {
                     | Event::NewEvents(StartCause::Poll) => {
-                        self.renderer.draw_frame(component.as_ref());
+                        self.renderer.draw_frame(component);
 
                         if self.app_config.log_fps {
                             let current_frame_time = SystemTime::now();
@@ -132,7 +132,7 @@ impl App {
 
                         match event {
                             WindowEvent::RedrawRequested => {
-                                self.renderer.draw_frame(component.as_ref());
+                                self.renderer.draw_frame(component);
                             },
                             WindowEvent::Resized( _ ) => {
                             }
