@@ -7,7 +7,9 @@ use std::{ptr, vec};
 use std::sync::Arc;
 use ash::khr::surface;
 use log::{debug, error, info, warn};
-use winit::raw_window_handle::RawDisplayHandle;
+use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, RawDisplayHandle};
+use winit::window::Window;
+use crate::graphics::renderer::WindowState;
 use crate::vulkan::LOG_TARGET;
 use crate::vulkan::surface::Surface;
 
@@ -61,7 +63,8 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn new(entry: &Entry, display_handle: RawDisplayHandle) -> Self {
+
+    pub fn new(entry: &Entry, window: &WindowState) -> Self {
         let app_name = CString::new("cen").unwrap();
         let engine_name = CString::new("Cen").unwrap();
         let app_info = vk::ApplicationInfo::default()
@@ -72,7 +75,7 @@ impl Instance {
             .application_name(app_name.as_c_str());
 
         let mut extension_names =
-            ash_window::enumerate_required_extensions(display_handle)
+            ash_window::enumerate_required_extensions(window.display_handle.as_raw())
                 .unwrap()
                 .to_vec();
         extension_names.push(debug_utils::NAME.as_ptr());

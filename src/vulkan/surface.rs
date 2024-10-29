@@ -2,7 +2,9 @@ use ash::khr::surface;
 use ash::vk;
 use ash::vk::{PresentModeKHR, SurfaceCapabilitiesKHR, SurfaceKHR};
 use log::trace;
-use crate::app::Window;
+use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle, WindowHandle};
+use winit::window::Window;
+use crate::graphics::renderer::WindowState;
 use crate::vulkan::{Instance, LOG_TARGET};
 
 /// A presentation surface for rendering graphics to a window.
@@ -12,15 +14,15 @@ pub struct Surface {
 }
 
 impl Surface {
-    pub fn new(entry: &ash::Entry, instance: &Instance, window: &Window) -> Surface {
+    pub fn new(entry: &ash::Entry, instance: &Instance, window: &WindowState ) -> Surface {
         let surface_loader = surface::Instance::new(&entry, instance.handle());
 
         let surface = unsafe {
             ash_window::create_surface(
                 &entry,
                 instance.handle(),
-                window.display_handle(),
-                window.window_handle(),
+                window.display_handle.as_raw(),
+                window.window_handle.as_raw(),
                 None,
             ).expect("Failed to get surface.")
         };

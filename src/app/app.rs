@@ -9,7 +9,7 @@ use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy
 use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 use crate::app::{Window};
 use crate::graphics::Renderer;
-use crate::graphics::renderer::RenderComponent;
+use crate::graphics::renderer::{RenderComponent, WindowState};
 
 pub struct App {
     _start_time: SystemTime,
@@ -59,7 +59,12 @@ impl App {
 
         let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build().expect("Failed to create event loop.");
         let window = Window::create(&event_loop, "cen", app_config.width, app_config.height);
-        let renderer = Renderer::new(&window, event_loop.create_proxy(), app_config.vsync);
+        let window_state = WindowState {
+            window_handle: window.window_handle(),
+            display_handle: window.display_handle(),
+            extent2d: window.get_extent()
+        };
+        let renderer = Renderer::new(&window_state, event_loop.create_proxy(), app_config.vsync);
 
         App {
             event_loop,

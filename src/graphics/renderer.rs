@@ -1,9 +1,10 @@
 use std::time::Instant;
 use ash::vk;
-use ash::vk::{FenceCreateFlags, ImageAspectFlags, PhysicalDevice, Queue};
+use ash::vk::{Extent2D, FenceCreateFlags, ImageAspectFlags, PhysicalDevice, Queue};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
-use crate::app::{Window};
+use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, HasRawWindowHandle, HasWindowHandle, WindowHandle};
+use winit::window::Window;
 use crate::app::app::UserEvent;
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain};
@@ -32,10 +33,16 @@ pub struct Renderer {
     pub start_time: Instant,
 }
 
+pub struct WindowState<'a> {
+    pub window_handle: WindowHandle<'a>,
+    pub display_handle: DisplayHandle<'a>,
+    pub extent2d: Extent2D
+}
+
 impl Renderer {
-    pub fn new(window: &Window, proxy: EventLoopProxy<UserEvent>, vsync: bool) -> Renderer {
+    pub fn new(window: &WindowState, proxy: EventLoopProxy<UserEvent>, vsync: bool) -> Renderer {
         let entry = ash::Entry::linked();
-        let instance = Instance::new(&entry, window.display_handle());
+        let instance = Instance::new(&entry, &window);
         let surface = Surface::new(&entry, &instance, &window);
         let (physical_device, queue_family_index) = instance.create_physical_device(&entry, &surface);
         let device = Device::new(&instance, physical_device, queue_family_index);
@@ -59,6 +66,7 @@ impl Renderer {
         } else {
             vk::PresentModeKHR::IMMEDIATE
         };
+
         let swapchain = Swapchain::new(&instance, &physical_device, &device, &window, &surface, present_mode);
         Self::transition_swapchain_images(&device, &command_pool, &queue, &swapchain);
 

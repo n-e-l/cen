@@ -1,9 +1,10 @@
 use std::sync::Arc;
 use ash::khr::swapchain;
 use ash::vk;
-use ash::vk::{CompositeAlphaFlagsKHR, ImageUsageFlags, PresentModeKHR, SharingMode, SurfaceFormatKHR, SwapchainKHR};
+use ash::vk::{CompositeAlphaFlagsKHR, Extent2D, ImageUsageFlags, PresentModeKHR, SharingMode, SurfaceFormatKHR, SwapchainKHR};
 use log::info;
-use crate::app::Window;
+use winit::window::Window;
+use crate::graphics::renderer::WindowState;
 use crate::vulkan::{Device, Instance, Surface, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
 
@@ -39,7 +40,7 @@ impl Swapchain {
         instance: &Instance,
         physical_device: &vk::PhysicalDevice,
         device: &Device,
-        window: &Window,
+        window: &WindowState,
         surface: &Surface,
         preferred_present_mode: PresentModeKHR
     ) -> Swapchain {
@@ -77,7 +78,7 @@ impl Swapchain {
             .unwrap_or(vk::PresentModeKHR::FIFO);
 
         let extent = match surface_capabilities.current_extent.width {
-            u32::MAX => window.get_extent(),
+            u32::MAX => window.extent2d,
             _ => surface_capabilities.current_extent
         };
 

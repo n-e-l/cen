@@ -3,7 +3,7 @@ use winit::event::WindowEvent;
 use winit::event::{ElementState, KeyEvent};
 use winit::event_loop::{EventLoop, EventLoopWindowTarget};
 use winit::keyboard::{Key, NamedKey};
-use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
+use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle, WindowHandle};
 use crate::app::app::UserEvent;
 
 /// System window wrapper.
@@ -26,12 +26,16 @@ impl Window {
         }
     }
 
-    pub fn window_handle(&self) -> RawWindowHandle {
-        self.window.window_handle().unwrap().as_raw()
+    pub fn winit_window(&self) -> &winit::window::Window {
+        &self.window
     }
 
-    pub fn display_handle(&self) -> RawDisplayHandle {
-        self.window.display_handle().unwrap().as_raw()
+    pub fn window_handle(&self) -> WindowHandle {
+        self.window.window_handle().unwrap()
+    }
+
+    pub fn display_handle(&self) -> DisplayHandle {
+        self.window.display_handle().unwrap()
     }
 
     pub fn get_extent(&self) -> Extent2D {
