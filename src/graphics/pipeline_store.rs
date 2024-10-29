@@ -41,9 +41,10 @@ impl PipelineStore {
 
         // Register file watching for the shaders
         let watcher = notify_debouncer_mini::new_debouncer(
-            Duration::from_millis(250),
-            Self::watch_callback(proxy)
-        ).expect("Failed to create file watcher");
+                Duration::from_millis(250),
+                Self::watch_callback(proxy)
+            ).expect("Failed to create file watcher")
+        ;
 
         PipelineStore {
             inner: Arc::new(Mutex::new(PipelineStoreInner{
@@ -77,7 +78,7 @@ impl PipelineStore {
         let mut inner = self.inner.lock().unwrap();
 
         // Watch for file changes
-        inner.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
+        self.inner.lock().unwrap().watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
 
         let pipeline = ComputePipeline::new(
             &inner.device,

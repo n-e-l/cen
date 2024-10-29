@@ -2,17 +2,17 @@ use std::any::Any;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use ash::vk::WriteDescriptorSet;
-use crate::vulkan::{CommandPool, Device, Framebuffer, Image, Pipeline, RenderPass};
+use crate::vulkan::{CommandPool, Device, Framebuffer, GpuHandle, Image, Pipeline, RenderPass};
 use crate::vulkan::device::DeviceInner;
 
 pub struct CommandBufferInner {
     device_dep: Arc<DeviceInner>,
     command_buffer: vk::CommandBuffer,
-    resource_handles: Vec<Arc<dyn Any>>,
+    resource_handles: Mutex<Vec<Arc<dyn GpuHandle>>>,
 }
 
 pub struct CommandBuffer {
-    inner: Arc<Mutex<CommandBufferInner>>,
+    inner: Arc<CommandBufferInner>,
 }
 
 impl CommandBuffer {
@@ -30,42 +30,35 @@ impl CommandBuffer {
         };
 
         CommandBuffer {
-            inner: Arc::new(Mutex::new(CommandBufferInner {
+            inner: Arc::new(CommandBufferInner {
                 device_dep: device.inner.clone(),
                 command_buffer,
-                resource_handles: Vec::new(),
-            })),
+                resource_handles: Mutex::new(Vec::new()),
+            }),
         }
-    }
-
-    fn inner(&self) -> std::sync::MutexGuard<CommandBufferInner> {
-        self.inner.lock().unwrap()
     }
 
     pub fn begin(&mut self) {
         let command_buffer_begin_info = vk::CommandBufferBeginInfo::default();
-        let mut inner = self.inner();
         unsafe {
-            inner.device_dep.device
-                .begin_command_buffer(inner.command_buffer, &command_buffer_begin_info)
+            self.inner.device_dep.device
+                .begin_command_buffer(self.inner.command_buffer, &command_buffer_begin_info)
                 .expect("Failed to begin command buffer");
         }
 
         // Reset resource handles
-        inner.resource_handles.clear();
+        self.inner.resource_handles.lock().expect("Failed to lock mutex").clear();
     }
 
     pub fn end(&self) {
-        let inner = self.inner();
         unsafe {
-            inner.device_dep.device
-                .end_command_buffer(inner.command_buffer)
+            self.inner.device_dep.device
+                .end_command_buffer(self.inner.command_buffer)
                 .expect("Failed to end command buffer");
         }
     }
 
     pub fn begin_render_pass(&self, render_pass: &RenderPass, framebuffer: &Framebuffer) {
-        let inner = self.inner();
         let render_pass_begin_info = vk::RenderPassBeginInfo::default()
             .render_area(vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
@@ -79,14 +72,12 @@ impl CommandBuffer {
             .render_pass(render_pass.handle())
             .framebuffer(framebuffer.handle());
         unsafe {
-            inner.device_dep.device
-                .cmd_begin_render_pass(inner.command_buffer, &render_pass_begin_info, vk::SubpassContents::INLINE);
+            self.inner.device_dep.device
+                .cmd_begin_render_pass(self.inner.command_buffer, &render_pass_begin_info, vk::SubpassContents::INLINE);
         }
     }
 
     pub fn bind_push_descriptor_images(&self, pipeline: &dyn Pipeline, images: &Vec<&Image>) {
-        let inner = self.inner();
-
         let bindings = images.iter().map(|image| {
             vk::DescriptorImageInfo::default()
                 .image_layout(vk::ImageLayout::GENERAL)
@@ -101,8 +92,8 @@ impl CommandBuffer {
             .image_info(&bindings);
 
         unsafe {
-            inner.device_dep.device_push_descriptor.cmd_push_descriptor_set(
-                inner.command_buffer,
+            self.inner.device_dep.device_push_descriptor.cmd_push_descriptor_set(
+                self.inner.command_buffer,
                 pipeline.bind_point(),
                 pipeline.layout(),
                 0,
@@ -112,7 +103,6 @@ impl CommandBuffer {
     }
 
     pub fn bind_push_descriptor_image(&self, pipeline: &dyn Pipeline, image: &Image) {
-        let inner = self.inner();
 
         // TODO: Set bindings dynamically
         let bindings = [vk::DescriptorImageInfo::default()
@@ -127,8 +117,8 @@ impl CommandBuffer {
             .image_info(&bindings);
 
         unsafe {
-            inner.device_dep.device_push_descriptor.cmd_push_descriptor_set(
-                inner.command_buffer,
+            self.inner.device_dep.device_push_descriptor.cmd_push_descriptor_set(
+                self.inner.command_buffer,
                 pipeline.bind_point(),
                 pipeline.layout(),
                 0,
@@ -138,10 +128,9 @@ impl CommandBuffer {
     }
 
     pub fn bind_push_descriptor(&self, pipeline: &dyn Pipeline, set: u32, write_descriptor_sets: &[WriteDescriptorSet]) {
-        let inner = self.inner();
         unsafe {
-            inner.device_dep.device_push_descriptor.cmd_push_descriptor_set(
-                inner.command_buffer,
+            self.inner.device_dep.device_push_descriptor.cmd_push_descriptor_set(
+                self.inner.command_buffer,
                 pipeline.bind_point(),
                 pipeline.layout(),
                 set,
@@ -151,39 +140,34 @@ impl CommandBuffer {
     }
 
     pub fn end_render_pass(&self) {
-        let inner = self.inner();
         unsafe {
-            inner.device_dep.device
-                .cmd_end_render_pass(inner.command_buffer);
+            self.inner.device_dep.device
+                .cmd_end_render_pass(self.inner.command_buffer);
         }
     }
 
     pub fn push_constants(&self, pipeline: &dyn Pipeline, stage_flags: vk::ShaderStageFlags, offset: u32, data: &[u8]) {
-        let inner = self.inner();
         unsafe {
-            inner.device_dep.device
-                .cmd_push_constants(inner.command_buffer, pipeline.layout(), stage_flags, offset, data);
+            self.inner.device_dep.device
+                .cmd_push_constants(self.inner.command_buffer, pipeline.layout(), stage_flags, offset, data);
         }
     }
 
     pub fn set_viewport(&self, viewport: vk::Viewport) {
-        let inner = self.inner();
         unsafe {
-            inner.device_dep.device
-                .cmd_set_viewport(inner.command_buffer, 0, &[viewport]);
+            self.inner.device_dep.device
+                .cmd_set_viewport(self.inner.command_buffer, 0, &[viewport]);
         }
     }
 
     pub fn set_scissor(&self, scissor: vk::Rect2D) {
-        let inner = self.inner();
         unsafe {
-            inner.device_dep.device
-                .cmd_set_scissor(inner.command_buffer, 0, &[scissor]);
+            self.inner.device_dep.device
+                .cmd_set_scissor(self.inner.command_buffer, 0, &[scissor]);
         }
     }
 
     pub fn clear_color_image(&self, image: &Image) {
-        let inner = self.inner();
         unsafe {
             let mut clear_color_value = vk::ClearColorValue::default();
             clear_color_value.float32 = [ 0f32, 0f32, 0f32, 0f32];
@@ -193,9 +177,9 @@ impl CommandBuffer {
                 .base_mip_level(0)
                 .layer_count(1)
                 .level_count(1) ];
-            inner.device_dep.device
+            self.inner.device_dep.device
                 .cmd_clear_color_image(
-                    inner.command_buffer,
+                    self.inner.command_buffer,
                     image.image,
                     vk::ImageLayout::GENERAL,
                     &clear_color_value,
@@ -205,19 +189,17 @@ impl CommandBuffer {
     }
 
     pub fn bind_pipeline(&mut self, pipeline: &dyn Pipeline) {
-        let mut inner = self.inner();
         unsafe {
-            inner.device_dep.device
-                .cmd_bind_pipeline(inner.command_buffer, pipeline.bind_point(), pipeline.handle());
+            self.inner.device_dep.device
+                .cmd_bind_pipeline(self.inner.command_buffer, pipeline.bind_point(), pipeline.handle());
         }
-        inner.resource_handles.push(pipeline.reference())
+        self.inner.resource_handles.lock().expect("Failed to lock mutex").push(pipeline.reference())
     }
 
     pub fn dispatch(&self, x: u32, y: u32, z: u32) {
-        let inner = self.inner();
         unsafe {
-            inner.device_dep.device
-                .cmd_dispatch(inner.command_buffer, x, y, z);
+            self.inner.device_dep.device
+                .cmd_dispatch(self.inner.command_buffer, x, y, z);
         }
     }
 
@@ -230,11 +212,10 @@ impl CommandBuffer {
         dependency_flags: vk::DependencyFlags,
         image: &Image
     ) {
-        let inner = self.inner();
         unsafe {
-            inner.device_dep.device
+            self.inner.device_dep.device
                 .cmd_pipeline_barrier(
-                    inner.command_buffer,
+                    self.inner.command_buffer,
                     src_stage_mask,
                     dst_stage_mask,
                     dependency_flags,
@@ -260,11 +241,10 @@ impl CommandBuffer {
     }
 
     pub fn bind_descriptor_sets(&self, pipeline: &dyn Pipeline, descriptor_sets: &[vk::DescriptorSet]) {
-        let inner = self.inner();
         unsafe {
-            inner.device_dep.device
+            self.inner.device_dep.device
                 .cmd_bind_descriptor_sets(
-                    inner.command_buffer,
+                    self.inner.command_buffer,
                     pipeline.bind_point(),
                     pipeline.layout(),
                     0,
@@ -275,8 +255,7 @@ impl CommandBuffer {
     }
 
     pub fn handle(&self) -> vk::CommandBuffer {
-        let inner = self.inner();
-        inner.command_buffer
+        self.inner.command_buffer
     }
 
     pub fn clone(&self) -> CommandBuffer {

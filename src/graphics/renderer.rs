@@ -29,7 +29,6 @@ pub struct Renderer {
     pub device: Device,
     pub physical_device: PhysicalDevice,
     pub instance: Instance,
-    pub proxy: EventLoopProxy<UserEvent>,
     pub start_time: Instant,
 }
 
@@ -95,7 +94,7 @@ impl Renderer {
             }
         }).collect::<Vec<vk::Fence>>();
 
-        let pipeline_store = PipelineStore::new( &device, proxy.clone() );
+        let pipeline_store = PipelineStore::new( &device, proxy );
 
         let start_time = std::time::Instant::now();
 
@@ -116,7 +115,6 @@ impl Renderer {
             pipeline_store,
             frame_index: 0,
             start_time,
-            proxy
         }
     }
 

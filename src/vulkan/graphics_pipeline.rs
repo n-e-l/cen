@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use ash::vk;
 use log::trace;
-use crate::vulkan::{DescriptorSetLayout, Device, Pipeline, RenderPass, LOG_TARGET};
+use crate::vulkan::{DescriptorSetLayout, Device, GpuHandle, Pipeline, RenderPass, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
 use crate::vulkan::pipeline::{create_shader_module, load_shader_code, PipelineErr};
 
@@ -26,6 +26,8 @@ impl Drop for GraphicsPipelineInner {
     }
 }
 
+impl GpuHandle for GraphicsPipelineInner {}
+
 pub struct GraphicsPipeline {
     inner: Arc<GraphicsPipelineInner>
 }
@@ -43,7 +45,7 @@ impl Pipeline for GraphicsPipeline {
         self.inner.pipeline_layout
     }
 
-    fn reference(&self) -> Arc<dyn Any> {
+    fn reference(&self) -> Arc<dyn GpuHandle> {
         self.inner.clone()
     }
 }

@@ -119,5 +119,5 @@ fn main() {
 
     let compute_example = ComputeRender::new(app.renderer());
 
-    app.run(&compute_example);
+    app.run(&compute_example, None);
 }

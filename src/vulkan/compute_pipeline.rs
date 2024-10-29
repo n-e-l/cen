@@ -6,7 +6,7 @@ use std::sync::Arc;
 use ash::vk;
 use ash::vk::PushConstantRange;
 use log::{trace};
-use crate::vulkan::{DescriptorSetLayout, Device, Pipeline, LOG_TARGET};
+use crate::vulkan::{DescriptorSetLayout, Device, GpuHandle, Pipeline, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
 use crate::vulkan::pipeline::{create_shader_module, load_shader_code, PipelineErr};
 
@@ -27,6 +27,8 @@ impl Drop for ComputePipelineInner {
     }
 }
 
+impl GpuHandle for ComputePipelineInner {}
+
 pub struct ComputePipeline {
     inner: Arc<ComputePipelineInner>
 }
@@ -44,7 +46,7 @@ impl Pipeline for ComputePipeline {
         self.inner.pipeline_layout
     }
 
-    fn reference(&self) -> Arc<dyn Any> {
+    fn reference(&self) -> Arc<dyn GpuHandle> {
         self.inner.clone()
     }
 }
