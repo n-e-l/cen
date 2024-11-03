@@ -10,7 +10,7 @@ use crate::graphics::pipeline_store::PipelineStore;
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain};
 
 pub trait RenderComponent {
-    fn render(&self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image);
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image);
 }
 
 pub struct Renderer {
@@ -155,7 +155,7 @@ impl Renderer {
         device.submit_single_time_command(*queue, &image_command_buffer);
     }
     
-    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_component: &dyn RenderComponent) {
+    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_component: &mut dyn RenderComponent) {
 
         let mut command_buffer = self.command_buffers[frame_index].clone();
 
@@ -207,7 +207,7 @@ impl Renderer {
     }
 
 
-    pub fn draw_frame(&mut self, render_component: &dyn RenderComponent) {
+    pub fn draw_frame(&mut self, render_component: &mut dyn RenderComponent) {
 
         // Wait for the current frame's command buffer to finish executing.
         self.device.wait_for_fence(self.in_flight_fences[self.frame_index]);

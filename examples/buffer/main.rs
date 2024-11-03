@@ -35,7 +35,7 @@ impl ComputeRender {
 }
 
 impl RenderComponent for ComputeRender {
-    fn render(&self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
 
         // Transition the swapchain image
         renderer.transition_image(
@@ -117,7 +117,7 @@ fn main() {
         log_fps: false,
     });
 
-    let compute_example = ComputeRender::new(app.renderer());
+    let mut compute_example = ComputeRender::new(app.renderer());
 
-    app.run(&compute_example, None);
+    app.run(&mut compute_example, None);
 }

@@ -94,7 +94,7 @@ impl App {
         }
     }
 
-    pub fn run(&mut self, component: &dyn RenderComponent, mut update: Option<&mut dyn FnMut()>) {
+    pub fn run(&mut self, component: &mut dyn RenderComponent, mut update: Option<&mut dyn FnMut()>) {
 
         // Register file watching for the shaders
         let _watcher = notify_debouncer_mini::new_debouncer(
