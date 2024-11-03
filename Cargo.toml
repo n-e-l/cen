@@ -24,11 +24,15 @@ notify = { version = "6.1.1" }
 notify-debouncer-mini = "0.4.1"
 slotmap = "1.0.7"
 presser = "0.3.1"
+egui-ash-renderer = { version = "0.6.0", features = ["gpu-allocator"] }
 
 [dev-dependencies]
 
 [[example]]
 name = "empty"
+
+[[example]]
+name = "egui"
 
 [[example]]
 name = "compute"

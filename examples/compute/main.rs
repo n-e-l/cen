@@ -66,7 +66,7 @@ impl ComputeRender {
 }
 
 impl RenderComponent for ComputeRender {
-    fn render(&self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
         // Render
         let compute = renderer.pipeline_store().get(self.pipeline).unwrap();
         command_buffer.bind_pipeline(&compute);
@@ -199,7 +199,7 @@ fn main() {
         log_fps: false,
     });
 
-    let compute_example = ComputeRender::new(app.renderer());
+    let mut compute_example = ComputeRender::new(app.renderer());
 
-    app.run(Box::new(compute_example));
+    app.run(&mut compute_example, None);
 }
