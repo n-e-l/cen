@@ -96,18 +96,6 @@ impl App {
 
     pub fn run(&mut self, component: &mut dyn RenderComponent, mut update: Option<&mut dyn FnMut()>) {
 
-        // Register file watching for the shaders
-        let _watcher = notify_debouncer_mini::new_debouncer(
-            Duration::from_millis(250),
-            Self::watch_callback(self.event_loop.create_proxy())
-        ).expect("Failed to create file watcher");
-
-        // TODO: Watch created shaders
-        /*let paths = &draw_config.passes.iter().map(|p| { p.shader.clone() }).collect::<Vec<String>>();
-        for path in paths {
-            watcher.watcher().watch(Path::new(path), RecursiveMode::Recursive).unwrap();
-        }*/
-
         // Event loop
 
         let mut last_print_time = SystemTime::now();
