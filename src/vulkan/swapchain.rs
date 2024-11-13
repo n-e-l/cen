@@ -1,9 +1,8 @@
 use std::sync::Arc;
 use ash::khr::swapchain;
 use ash::vk;
-use ash::vk::{CompositeAlphaFlagsKHR, Extent2D, ImageUsageFlags, PresentModeKHR, SharingMode, SurfaceFormatKHR, SwapchainKHR};
+use ash::vk::{CompositeAlphaFlagsKHR, ImageUsageFlags, PresentModeKHR, SharingMode, SurfaceFormatKHR, SwapchainKHR};
 use log::info;
-use winit::window::Window;
 use crate::graphics::renderer::WindowState;
 use crate::vulkan::{Device, Instance, Surface, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;

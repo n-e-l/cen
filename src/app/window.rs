@@ -1,10 +1,10 @@
 use ash::vk::Extent2D;
 use winit::event::WindowEvent;
 use winit::event::{ElementState, KeyEvent};
-use winit::event_loop::{EventLoop, EventLoopWindowTarget};
+use winit::event_loop::{ActiveEventLoop};
 use winit::keyboard::{Key, NamedKey};
-use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle, WindowHandle};
-use crate::app::app::UserEvent;
+use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, WindowHandle};
+use winit::window::WindowAttributes;
 
 /// System window wrapper.
 /// Handles window events i.e. close, redraw, keyboard input.
@@ -13,13 +13,12 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn create(event_loop: &EventLoop<UserEvent>, window_title: &str, width: u32, height: u32) -> Window {
-        let window = winit::window::WindowBuilder::new()
+    pub fn create(event_loop: &ActiveEventLoop, window_title: &str, width: u32, height: u32) -> Window {
+        let window = event_loop.create_window(WindowAttributes::default()
             .with_title(window_title)
             .with_resizable(false)
             .with_inner_size(winit::dpi::LogicalSize::new(width, height))
-            .build(event_loop)
-            .expect("Failed to create window.");
+        ).expect("Failed to create window");
 
         Window {
             window,
@@ -44,10 +43,10 @@ impl Window {
         Extent2D{ width, height }
     }
 
-    pub fn window_event(&mut self, event: WindowEvent, elwt: &EventLoopWindowTarget<UserEvent>) {
+    pub fn window_event(&mut self, event: WindowEvent, event_loop: &ActiveEventLoop) {
         match event {
             WindowEvent::CloseRequested => {
-                elwt.exit();
+                event_loop.exit();
             }
             WindowEvent::KeyboardInput {
                 event:
@@ -59,10 +58,10 @@ impl Window {
                 ..
             } => match key.as_ref() {
                 Key::Named(NamedKey::Escape) => {
-                    elwt.exit();
+                    event_loop.exit();
                 },
                 Key::Character("q") => {
-                    elwt.exit();
+                    event_loop.exit();
                 }
                 _ => {}
             },

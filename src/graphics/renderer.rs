@@ -3,13 +3,13 @@ use ash::vk;
 use ash::vk::{Extent2D, FenceCreateFlags, ImageAspectFlags, PhysicalDevice, Queue};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
-use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, HasRawWindowHandle, HasWindowHandle, WindowHandle};
-use winit::window::Window;
+use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain};
 
 pub trait RenderComponent {
+    fn construct(renderer: &mut Renderer) -> Self where Self: Sized;
     fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image);
 }
 

@@ -7,8 +7,6 @@ use std::{ptr, vec};
 use std::sync::Arc;
 use ash::khr::surface;
 use log::{debug, error, info, warn};
-use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, RawDisplayHandle};
-use winit::window::Window;
 use crate::graphics::renderer::WindowState;
 use crate::vulkan::LOG_TARGET;
 use crate::vulkan::surface::Surface;

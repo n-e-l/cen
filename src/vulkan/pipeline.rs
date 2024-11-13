@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::{fmt, fs};
-use std::any::Any;
 use std::path::PathBuf;
 use std::sync::Arc;
 use ash::vk;

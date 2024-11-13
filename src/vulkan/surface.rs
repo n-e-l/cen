@@ -2,8 +2,6 @@ use ash::khr::surface;
 use ash::vk;
 use ash::vk::{PresentModeKHR, SurfaceCapabilitiesKHR, SurfaceKHR};
 use log::trace;
-use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle, WindowHandle};
-use winit::window::Window;
 use crate::graphics::renderer::WindowState;
 use crate::vulkan::{Instance, LOG_TARGET};
 

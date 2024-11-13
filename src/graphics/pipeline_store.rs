@@ -78,7 +78,7 @@ impl PipelineStore {
         let mut inner = self.inner.lock().unwrap();
 
         // Watch for file changes
-        self.inner.lock().unwrap().watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
+        inner.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
 
         let pipeline = ComputePipeline::new(
             &inner.device,
