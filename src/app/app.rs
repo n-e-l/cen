@@ -29,6 +29,7 @@ pub struct AppConfig {
     height: u32,
     vsync: bool,
     log_fps: bool,
+    fullscreen: bool,
 }
 
 impl AppConfig {
@@ -38,7 +39,8 @@ impl AppConfig {
             width: 1000,
             height: 1000,
             vsync: true,
-            log_fps: false
+            log_fps: false,
+            fullscreen: false
         }
     }
 
@@ -61,6 +63,12 @@ impl AppConfig {
         self.log_fps = log_fps;
         self
     }
+
+    pub fn fullscreen(mut self, fullscreen: bool) -> Self {
+        self.fullscreen = fullscreen;
+        self
+    }
+
 }
 
 #[derive(Debug, Default)]
@@ -102,7 +110,7 @@ impl<T: RenderComponent> ApplicationHandler<UserEvent> for App<T>
         self.initialized = true;
 
         // Create the graphics context
-        let window = Window::create(&event_loop, "cen", self.app_config.width, self.app_config.height);
+        let window = Window::create(&event_loop, "cen", self.app_config.width, self.app_config.height, self.app_config.fullscreen);
         let window_state = WindowState {
             window_handle: window.window_handle(),
             display_handle: window.display_handle(),

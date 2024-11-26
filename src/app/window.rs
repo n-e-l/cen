@@ -13,12 +13,17 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn create(event_loop: &ActiveEventLoop, window_title: &str, width: u32, height: u32) -> Window {
-        let window = event_loop.create_window(WindowAttributes::default()
+    pub fn create(event_loop: &ActiveEventLoop, window_title: &str, width: u32, height: u32, fullscreen: bool) -> Window {
+        let mut attributes = WindowAttributes::default()
             .with_title(window_title)
             .with_resizable(false)
-            .with_inner_size(winit::dpi::LogicalSize::new(width, height))
-        ).expect("Failed to create window");
+            .with_inner_size(winit::dpi::LogicalSize::new(width, height));
+
+        if fullscreen {
+            attributes = attributes.with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)));
+        }
+
+        let mut window = event_loop.create_window(attributes).expect("Failed to create window");
 
         Window {
             window,
