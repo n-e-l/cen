@@ -9,7 +9,7 @@ use crate::graphics::pipeline_store::PipelineStore;
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain};
 
 pub trait RenderComponent {
-    fn construct(renderer: &mut Renderer) -> Self where Self: Sized;
+    fn initialize(&mut self, renderer: &mut Renderer);
     fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image);
 }
 
