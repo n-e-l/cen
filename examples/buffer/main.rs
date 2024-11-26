@@ -11,9 +11,8 @@ struct ComputeRender {
     buffer: Buffer,
 }
 
-impl ComputeRender {
-    fn new(renderer: &mut Renderer) -> Self {
-
+impl RenderComponent for ComputeRender {
+    fn construct(renderer: &mut Renderer) -> ComputeRender {
         // Image
         let mut buffer = Buffer::new(
             &renderer.device,
@@ -32,10 +31,8 @@ impl ComputeRender {
             buffer,
         }
     }
-}
 
-impl RenderComponent for ComputeRender {
-    fn render(&self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
 
         // Transition the swapchain image
         renderer.transition_image(
@@ -110,14 +107,5 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
-    let mut app = App::new(AppConfig {
-        width: 1000,
-        height: 1000,
-        vsync: false,
-        log_fps: false,
-    });
-
-    let compute_example = ComputeRender::new(app.renderer());
-
-    app.run(&compute_example);
+    App::<ComputeRender>::run(AppConfig::default());
 }

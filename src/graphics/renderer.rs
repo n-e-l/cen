@@ -1,15 +1,16 @@
 use std::time::Instant;
 use ash::vk;
-use ash::vk::{FenceCreateFlags, ImageAspectFlags, PhysicalDevice, Queue};
+use ash::vk::{Extent2D, FenceCreateFlags, ImageAspectFlags, PhysicalDevice, Queue};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
-use crate::app::{Window};
+use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain};
 
 pub trait RenderComponent {
-    fn render(&self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image);
+    fn construct(renderer: &mut Renderer) -> Self where Self: Sized;
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image);
 }
 
 pub struct Renderer {
@@ -28,14 +29,19 @@ pub struct Renderer {
     pub device: Device,
     pub physical_device: PhysicalDevice,
     pub instance: Instance,
-    pub proxy: EventLoopProxy<UserEvent>,
     pub start_time: Instant,
 }
 
+pub struct WindowState<'a> {
+    pub window_handle: WindowHandle<'a>,
+    pub display_handle: DisplayHandle<'a>,
+    pub extent2d: Extent2D
+}
+
 impl Renderer {
-    pub fn new(window: &Window, proxy: EventLoopProxy<UserEvent>, vsync: bool) -> Renderer {
+    pub fn new(window: &WindowState, proxy: EventLoopProxy<UserEvent>, vsync: bool) -> Renderer {
         let entry = ash::Entry::linked();
-        let instance = Instance::new(&entry, window.display_handle());
+        let instance = Instance::new(&entry, &window);
         let surface = Surface::new(&entry, &instance, &window);
         let (physical_device, queue_family_index) = instance.create_physical_device(&entry, &surface);
         let device = Device::new(&instance, physical_device, queue_family_index);
@@ -59,6 +65,7 @@ impl Renderer {
         } else {
             vk::PresentModeKHR::IMMEDIATE
         };
+
         let swapchain = Swapchain::new(&instance, &physical_device, &device, &window, &surface, present_mode);
         Self::transition_swapchain_images(&device, &command_pool, &queue, &swapchain);
 
@@ -87,7 +94,7 @@ impl Renderer {
             }
         }).collect::<Vec<vk::Fence>>();
 
-        let pipeline_store = PipelineStore::new( &device, proxy.clone() );
+        let pipeline_store = PipelineStore::new( &device, proxy );
 
         let start_time = std::time::Instant::now();
 
@@ -108,7 +115,6 @@ impl Renderer {
             pipeline_store,
             frame_index: 0,
             start_time,
-            proxy
         }
     }
 
@@ -149,7 +155,7 @@ impl Renderer {
         device.submit_single_time_command(*queue, &image_command_buffer);
     }
     
-    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_component: &dyn RenderComponent) {
+    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_component: &mut dyn RenderComponent) {
 
         let mut command_buffer = self.command_buffers[frame_index].clone();
 
@@ -201,7 +207,7 @@ impl Renderer {
     }
 
 
-    pub fn draw_frame(&mut self, render_component: &dyn RenderComponent) {
+    pub fn draw_frame(&mut self, render_component: &mut dyn RenderComponent) {
 
         // Wait for the current frame's command buffer to finish executing.
         self.device.wait_for_fence(self.in_flight_fences[self.frame_index]);

@@ -8,19 +8,17 @@ struct EmptyRend {
 }
 
 impl RenderComponent for EmptyRend {
-    fn render(&self, _: &mut Renderer, _: &mut CommandBuffer, _: &Image) {
+    fn construct(_: &mut Renderer) -> Self
+    where
+        Self: Sized
+    {
+        Self {}
+    }
+
+    fn render(&mut self, _: &mut Renderer, _: &mut CommandBuffer, _: &Image) {
     }
 }
 
 fn main() {
-
-    let app = App::new(AppConfig {
-        width: 1000,
-        height: 1000,
-        vsync: true,
-        log_fps: false,
-    });
-
-    let render_comp = EmptyRend {};
-    app.run(Box::new(render_comp));
+    App::<EmptyRend>::run(AppConfig::default());
 }

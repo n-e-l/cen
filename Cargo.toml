@@ -13,7 +13,7 @@ categories = ["rendering::engine"]
 [dependencies]
 ash = { version = "0.38.0", features = ["linked"] }
 ash-window = "0.13.0"
-winit = "0.29.15"
+winit = "0.30.5"
 shaderc = "0.8.3"
 log = "0.4.21"
 env_logger = "0.11.5"
@@ -24,6 +24,8 @@ notify = { version = "6.1.1" }
 notify-debouncer-mini = "0.4.1"
 slotmap = "1.0.7"
 presser = "0.3.1"
+egui-ash-renderer = { version = "0.6.0", features = ["gpu-allocator"] }
+egui = "0.29.1"
 
 [dev-dependencies]
 

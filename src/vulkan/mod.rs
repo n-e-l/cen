@@ -13,6 +13,7 @@ mod image;
 mod descriptor_set_layout;
 mod allocator;
 mod buffer;
+mod memory;
 
 pub(crate) const LOG_TARGET: &'static str = "cen::vulkan";
 
@@ -32,3 +33,4 @@ pub use self::swapchain::Swapchain;
 pub use self::pipeline::Pipeline;
 pub use self::pipeline::PipelineErr;
 pub use self::renderpass::RenderPass;
+pub use self::memory::GpuHandle;

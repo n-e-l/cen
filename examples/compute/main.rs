@@ -7,15 +7,18 @@ use cen::graphics::Renderer;
 use cen::graphics::renderer::RenderComponent;
 use cen::vulkan::{CommandBuffer, DescriptorSetLayout, Image};
 
+#[allow(dead_code)]
 struct ComputeRender {
     image: Image,
     descriptorset: DescriptorSetLayout,
     pipeline: PipelineKey,
 }
 
-impl ComputeRender {
-    fn new(renderer: &mut Renderer) -> Self {
-
+impl RenderComponent for ComputeRender {
+    fn construct(renderer: &mut Renderer) -> Self
+    where
+        Self: Sized
+    {
         // Image
         let image = Image::new(
             &renderer.device,
@@ -63,10 +66,8 @@ impl ComputeRender {
             pipeline
         }
     }
-}
 
-impl RenderComponent for ComputeRender {
-    fn render(&self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
         // Render
         let compute = renderer.pipeline_store().get(self.pipeline).unwrap();
         command_buffer.bind_pipeline(&compute);
@@ -192,14 +193,5 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
-    let mut app = App::new(AppConfig {
-        width: 1000,
-        height: 1000,
-        vsync: false,
-        log_fps: false,
-    });
-
-    let compute_example = ComputeRender::new(app.renderer());
-
-    app.run(Box::new(compute_example));
+    App::<ComputeRender>::run(AppConfig::default());
 }
