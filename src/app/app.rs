@@ -10,12 +10,11 @@ use crate::app::{Window};
 use crate::graphics::Renderer;
 use crate::graphics::renderer::{RenderComponent, WindowState};
 
-pub struct App<T>
-where T: RenderComponent
+pub struct App
 {
     initialized: bool,
     _start_time: SystemTime,
-    components: Option<T>,
+    components: Box<dyn RenderComponent>,
     renderer: Option<Renderer>,
     window: Option<Window>,
     frame_count: usize,
@@ -78,12 +77,12 @@ pub enum UserEvent {
     GlslUpdate(PathBuf),
 }
 
-impl<T: RenderComponent> ApplicationHandler<UserEvent> for App<T>
+impl ApplicationHandler<UserEvent> for App
 {
     fn new_events(&mut self, _: &ActiveEventLoop, cause: StartCause) {
         match cause {
             | StartCause::Poll => {
-                self.renderer.as_mut().unwrap().draw_frame(self.components.as_mut().unwrap());
+                self.renderer.as_mut().unwrap().draw_frame(self.components.as_mut());
 
                 if self.app_config.log_fps {
                     let current_frame_time = SystemTime::now();
@@ -119,8 +118,7 @@ impl<T: RenderComponent> ApplicationHandler<UserEvent> for App<T>
 
         let mut renderer = Renderer::new(&window_state, self.proxy.clone(), self.app_config.vsync);
 
-        self.components = Some(T::construct(&mut renderer));
-        // self.gui_component = Some(GuiComponent::new(&self.renderer.as_mut().unwrap(), &window.display_handle()));
+        self.components.initialize(&mut renderer);
 
         self.renderer = Some(renderer);
 
@@ -145,7 +143,7 @@ impl<T: RenderComponent> ApplicationHandler<UserEvent> for App<T>
 
         match event {
             WindowEvent::RedrawRequested => {
-                self.renderer.as_mut().unwrap().draw_frame(self.components.as_mut().unwrap());
+                self.renderer.as_mut().unwrap().draw_frame(self.components.as_mut());
             },
             WindowEvent::Resized( _ ) => {
             }
@@ -173,7 +171,7 @@ impl<T: RenderComponent> ApplicationHandler<UserEvent> for App<T>
     }
 }
 
-impl<T: RenderComponent> App<T> {
+impl App {
 
     fn init_logger() {
         let env = Env::default()
@@ -192,7 +190,7 @@ impl<T: RenderComponent> App<T> {
             .init();
     }
 
-    pub fn run(app_config: AppConfig) {
+    pub fn run(app_config: AppConfig, render_component: Box<dyn RenderComponent>) {
 
         Self::init_logger();
 
@@ -201,11 +199,11 @@ impl<T: RenderComponent> App<T> {
 
         let event_loop = EventLoopBuilder::default().build().expect("Failed to create event loop.");
 
-        let mut app: App<T> = App {
+        let mut app: App = App {
             initialized: false,
             window: None,
             renderer: None,
-            components: None,
+            components: render_component,
             // gui_component: None,
             _start_time: start_time,
             frame_count: 0,

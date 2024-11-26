@@ -9,16 +9,13 @@ use cen::vulkan::{CommandBuffer, DescriptorSetLayout, Image};
 
 #[allow(dead_code)]
 struct ComputeRender {
-    image: Image,
-    descriptorset: DescriptorSetLayout,
-    pipeline: PipelineKey,
+    image: Option<Image>,
+    descriptorset: Option<DescriptorSetLayout>,
+    pipeline: Option<PipelineKey>,
 }
 
 impl RenderComponent for ComputeRender {
-    fn construct(renderer: &mut Renderer) -> Self
-    where
-        Self: Sized
-    {
+    fn initialize(&mut self, renderer: &mut Renderer) {
         // Image
         let image = Image::new(
             &renderer.device,
@@ -60,19 +57,17 @@ impl RenderComponent for ComputeRender {
             macros: Default::default(),
         }).expect("Failed to create pipeline");
 
-        Self {
-            image,
-            descriptorset,
-            pipeline
-        }
+        self.image = Some(image);
+        self.descriptorset = Some(descriptorset);
+        self.pipeline = Some(pipeline);
     }
 
     fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
         // Render
-        let compute = renderer.pipeline_store().get(self.pipeline).unwrap();
+        let compute = renderer.pipeline_store().get(self.pipeline.unwrap()).unwrap();
         command_buffer.bind_pipeline(&compute);
 
-        let bindings = [self.image.binding(vk::ImageLayout::GENERAL)];
+        let bindings = [self.image.as_ref().unwrap().binding(vk::ImageLayout::GENERAL)];
 
         let write_descriptor_set = WriteDescriptorSet::default()
             .dst_binding(0)
@@ -90,7 +85,7 @@ impl RenderComponent for ComputeRender {
         // Transition the render to a source
         renderer.transition_image(
             &command_buffer,
-            &self.image.handle(),
+            &self.image.as_ref().unwrap().handle(),
             vk::ImageLayout::GENERAL,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::PipelineStageFlags::COMPUTE_SHADER,
@@ -133,18 +128,18 @@ impl RenderComponent for ComputeRender {
             // Use a blit, as a copy doesn't synchronize properly to the swapchain on MoltenVK
             renderer.device.handle().cmd_blit_image(
                 command_buffer.handle(),
-                *self.image.handle(),
+                *self.image.as_ref().unwrap().handle(),
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                 *swapchain_image,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                 &[vk::ImageBlit::default()
                     .src_offsets([
                         vk::Offset3D::default(),
-                        vk::Offset3D::default().x(self.image.width as i32).y(self.image.height as i32).z(1)
+                        vk::Offset3D::default().x(self.image.as_ref().unwrap().width as i32).y(self.image.as_ref().unwrap().height as i32).z(1)
                     ])
                     .dst_offsets([
                         vk::Offset3D::default(),
-                        vk::Offset3D::default().x(self.image.width as i32).y(self.image.height as i32).z(1)
+                        vk::Offset3D::default().x(self.image.as_ref().unwrap().width as i32).y(self.image.as_ref().unwrap().height as i32).z(1)
                     ])
                     .src_subresource(
                         vk::ImageSubresourceLayers::default()
@@ -180,7 +175,7 @@ impl RenderComponent for ComputeRender {
         // Transition the render image back
         renderer.transition_image(
             &command_buffer,
-            &self.image.handle(),
+            &self.image.as_ref().unwrap().handle(),
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::ImageLayout::GENERAL,
             vk::PipelineStageFlags::TRANSFER,
@@ -193,5 +188,9 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
-    App::<ComputeRender>::run(AppConfig::default());
+    App::run(AppConfig::default(), Box::new(ComputeRender {
+        image: None,
+        descriptorset: None,
+        pipeline: None,
+    }));
 }
