@@ -86,6 +86,7 @@ impl Instance {
             extension_names.push(ash::khr::get_physical_device_properties2::NAME.as_ptr());
         }
 
+
         let validation: ValidationInfo = ValidationInfo {
             required_validation_layers: vec![
                 CString::new("VK_LAYER_KHRONOS_validation").unwrap()
@@ -104,11 +105,15 @@ impl Instance {
             vk::InstanceCreateFlags::default()
         };
 
-        let create_info = vk::InstanceCreateInfo::default()
+        let mut create_info = vk::InstanceCreateInfo::default()
             .application_info(&app_info)
             .enabled_extension_names(&extension_names)
-            .enabled_layer_names(&c_ptr_validation_layers)
             .flags(create_flags);
+
+        #[cfg(debug_assertions)]
+        {
+            create_info = create_info.enabled_layer_names(&c_ptr_validation_layers);
+        }
 
         let instance: ash::Instance = unsafe {
             entry
