@@ -21,7 +21,7 @@ impl Drop for Buffer {
             let buffer_addr = format!("{:?}", self.buffer);
             if let Some(allocation) = self.allocation.take() {
                 let memory_addr = format!("{:?}, {:?}", allocation.memory(), allocation.chunk_id());
-                self.allocator_dep.lock().unwrap().allocator.free(allocation).unwrap();
+                self.allocator_dep.lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
                 trace!(target: LOG_TARGET, "Destroyed buffer memory: [{}]", memory_addr)
             }
             self.device_dep.device.destroy_buffer(self.buffer, None);
@@ -48,7 +48,7 @@ impl Buffer {
 
         // Allocate memory
         let requirements = unsafe { device.handle().get_buffer_memory_requirements(buffer) };
-        let allocation = allocator.handle().allocator
+        let allocation = allocator.handle().lock().unwrap()
             .allocate(&gpu_allocator::vulkan::AllocationCreateDesc {
                 name: "Buffer",
                 requirements,

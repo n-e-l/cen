@@ -69,7 +69,7 @@ impl Instance {
             .application_version(0)
             .engine_name(engine_name.as_c_str())
             .engine_version(0)
-            .api_version(vk::make_api_version(0, 1, 0, 0))
+            .api_version(vk::make_api_version(0, 1, 2, 0))
             .application_name(app_name.as_c_str());
 
         let mut extension_names =

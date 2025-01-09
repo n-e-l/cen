@@ -1,12 +1,16 @@
 use winit::application::ApplicationHandler;
 use std::path::{PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime};
+use ash::vk::Extent2D;
 use env_logger::{Builder, Env};
 use log::{debug, error, info, LevelFilter};
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoopBuilder, EventLoopProxy};
+use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::WindowId;
 use crate::app::{Window};
+use crate::app::gui::GuiComponent;
 use crate::graphics::Renderer;
 use crate::graphics::renderer::{RenderComponent, WindowState};
 
@@ -14,9 +18,10 @@ pub struct App
 {
     initialized: bool,
     _start_time: SystemTime,
-    components: Box<dyn RenderComponent>,
+    component: Box<dyn RenderComponent>,
+    gui_component: Option<GuiComponent>,
     renderer: Option<Renderer>,
-    window: Option<Window>,
+    window: Option<Arc<Mutex<Window>>>,
     frame_count: usize,
     pub app_config: AppConfig,
     last_print_time: SystemTime,
@@ -82,7 +87,7 @@ impl ApplicationHandler<UserEvent> for App
     fn new_events(&mut self, _: &ActiveEventLoop, cause: StartCause) {
         match cause {
             | StartCause::Poll => {
-                self.renderer.as_mut().unwrap().draw_frame(self.components.as_mut());
+                self.draw();
 
                 if self.app_config.log_fps {
                     let current_frame_time = SystemTime::now();
@@ -110,19 +115,26 @@ impl ApplicationHandler<UserEvent> for App
 
         // Create the graphics context
         let window = Window::create(&event_loop, "cen", self.app_config.width, self.app_config.height, self.app_config.fullscreen);
-        let window_state = WindowState {
-            window_handle: window.window_handle(),
-            display_handle: window.display_handle(),
-            extent2d: window.get_extent()
-        };
 
-        let mut renderer = Renderer::new(&window_state, self.proxy.clone(), self.app_config.vsync);
+        // Setup renderer
+        {
+            let window_state = WindowState {
+                window_handle: window.window_handle(),
+                display_handle: window.display_handle(),
+                extent2d: window.get_extent(),
+            };
+            
+            let renderer = Renderer::new(&window_state, self.proxy.clone(), self.app_config.vsync);
+            
+            self.renderer = Some(renderer);
+        }
 
-        self.components.initialize(&mut renderer);
+        self.window = Some(Arc::new(Mutex::new(window)));
 
-        self.renderer = Some(renderer);
-
-        self.window = Some(window);
+        // Add gui component (wip)
+        self.component.initialize(self.renderer.as_mut().unwrap());
+        self.gui_component = Some(GuiComponent::new(Arc::downgrade(&self.window.as_mut().unwrap())));
+        self.gui_component.as_mut().unwrap().initialize(self.renderer.as_mut().unwrap());
     }
 
     fn user_event(&mut self, _: &ActiveEventLoop, event: UserEvent) {
@@ -137,13 +149,15 @@ impl ApplicationHandler<UserEvent> for App
             _ => (),
         }
     }
-
+    
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
-        self.window.as_mut().unwrap().window_event( event.clone(), event_loop );
+        self.window.as_mut().unwrap().lock().unwrap().window_event( event.clone(), event_loop );
+        
+        self.gui_component.as_mut().unwrap().on_window_event(self.window.as_mut().unwrap().lock().unwrap().winit_window(), &event);
 
         match event {
             WindowEvent::RedrawRequested => {
-                self.renderer.as_mut().unwrap().draw_frame(self.components.as_mut());
+                self.draw();
             },
             WindowEvent::Resized( _ ) => {
             }
@@ -187,6 +201,7 @@ impl App {
             .filter(Some("mio::poll"), LevelFilter::Error)
             .filter(Some("sctk"), LevelFilter::Error)
             .filter(Some("notify_debouncer_mini"), LevelFilter::Error)
+            .filter(Some("egui_ash_renderer"), LevelFilter::Error)
             .init();
     }
 
@@ -199,12 +214,13 @@ impl App {
 
         let event_loop = EventLoopBuilder::default().build().expect("Failed to create event loop.");
 
+
         let mut app: App = App {
             initialized: false,
             window: None,
             renderer: None,
-            components: render_component,
-            // gui_component: None,
+            component: render_component,
+            gui_component: None,
             _start_time: start_time,
             frame_count: 0,
             app_config,
@@ -214,6 +230,13 @@ impl App {
 
         event_loop.set_control_flow(ControlFlow::Poll);
         event_loop.run_app(&mut app).unwrap();
+    }
+
+    fn draw(&mut self) {
+        self.renderer.as_mut().unwrap().draw_frame(&mut [
+            self.component.as_mut(),
+            self.gui_component.as_mut().unwrap()
+        ]);
     }
 
 }

@@ -1,4 +1,4 @@
-use ash::vk::Image;
+use ash::vk;
 use cen::app::app::{App, AppConfig};
 use cen::graphics::{Renderer};
 use cen::graphics::renderer::RenderComponent;
@@ -8,17 +8,14 @@ struct EmptyRend {
 }
 
 impl RenderComponent for EmptyRend {
-    fn construct(_: &mut Renderer) -> Self
-    where
-        Self: Sized
-    {
-        Self {}
+    fn initialize(&mut self, _: &mut Renderer) {
     }
 
-    fn render(&mut self, _: &mut Renderer, _: &mut CommandBuffer, _: &Image) {
+    fn render(&mut self, _: &mut Renderer, _: &mut CommandBuffer, _: &vk::Image, _: &vk::ImageView) {
     }
 }
 
 fn main() {
-    App::<EmptyRend>::run(AppConfig::default());
+    App::run(AppConfig::default(), Box::new(EmptyRend {
+    }));
 }

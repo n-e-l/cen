@@ -6,6 +6,9 @@ use winit::keyboard::{Key, NamedKey};
 use winit::raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, WindowHandle};
 use winit::window::WindowAttributes;
 
+pub struct WindowInner {
+}
+
 /// System window wrapper.
 /// Handles window events i.e. close, redraw, keyboard input.
 pub struct Window {
@@ -23,7 +26,7 @@ impl Window {
             attributes = attributes.with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)));
         }
 
-        let mut window = event_loop.create_window(attributes).expect("Failed to create window");
+        let window = event_loop.create_window(attributes).expect("Failed to create window");
 
         Window {
             window,

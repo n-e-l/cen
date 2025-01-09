@@ -12,6 +12,7 @@ pub struct DeviceInner {
     pub device: ash::Device,
     pub device_push_descriptor: ash::khr::push_descriptor::Device,
     pub queue_family_index: u32,
+    pub dynamic_rendering_loader: ash::khr::dynamic_rendering::Device
 }
 
 impl Drop for DeviceInner {
@@ -41,6 +42,8 @@ impl Device {
             swapchain::NAME.as_ptr(),
             // Push descriptors
             ash::khr::push_descriptor::NAME.as_ptr(),
+            // Dynamic rendering
+            ash::khr::dynamic_rendering::NAME.as_ptr(),
             // MoltenVK
             #[cfg(target_os = "macos")]
                 ash::khr::portability_subset::NAME.as_ptr(),
@@ -51,10 +54,14 @@ impl Device {
             ..Default::default()
         };
 
+        let mut dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures::default()
+            .dynamic_rendering(true);
+
         let device_create_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(std::slice::from_ref(&queue_info))
             .enabled_extension_names(&device_extension_names_raw)
-            .enabled_features(&features);
+            .enabled_features(&features)
+            .push_next(&mut dynamic_rendering_features);
 
         let device = unsafe {
             instance.handle()
@@ -64,12 +71,15 @@ impl Device {
         trace!(target: LOG_TARGET, "Created device: {:?}", device.handle());
 
         let device_push_descriptor = ash::khr::push_descriptor::Device::new(instance.handle(), &device);
+        
+        let dynamic_rendering_loader = ash::khr::dynamic_rendering::Device::new(instance.handle(), &device);
 
         let device_inner = DeviceInner {
             instance_dep: instance.inner.clone(),
             device,
             device_push_descriptor,
             queue_family_index,
+            dynamic_rendering_loader,
         };
 
         Self {

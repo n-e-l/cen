@@ -8,11 +8,11 @@ use cen::graphics::renderer::RenderComponent;
 use cen::vulkan::{Buffer, CommandBuffer};
 
 struct ComputeRender {
-    buffer: Buffer,
+    buffer: Option<Buffer>,
 }
 
 impl RenderComponent for ComputeRender {
-    fn construct(renderer: &mut Renderer) -> ComputeRender {
+    fn initialize(&mut self, renderer: &mut Renderer) {
         // Image
         let mut buffer = Buffer::new(
             &renderer.device,
@@ -27,12 +27,10 @@ impl RenderComponent for ComputeRender {
             *i = 255u8;
         }
 
-        Self {
-            buffer,
-        }
+        self.buffer = Some(buffer);
     }
 
-    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image, _: &vk::ImageView) {
 
         // Transition the swapchain image
         renderer.transition_image(
@@ -66,7 +64,7 @@ impl RenderComponent for ComputeRender {
 
             renderer.device.handle().cmd_copy_buffer_to_image(
                 command_buffer.handle(),
-                *self.buffer.handle(),
+                *self.buffer.as_ref().unwrap().handle(),
                 *swapchain_image,
                 ImageLayout::TRANSFER_DST_OPTIMAL,
                 &[
@@ -107,5 +105,8 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
-    App::<ComputeRender>::run(AppConfig::default());
+    App::run(AppConfig::default(), Box::new(ComputeRender {
+        buffer: None
+    }));
 }
+

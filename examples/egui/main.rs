@@ -49,7 +49,7 @@ impl RenderComponent for ComputeRender {
 
         // Pipeline
         let pipeline = renderer.pipeline_store().insert(PipelineConfig {
-            shader_path: "examples/compute/shader.comp".into(),
+            shader_path: "examples/egui/shader.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
             ],
@@ -63,6 +63,7 @@ impl RenderComponent for ComputeRender {
     }
 
     fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image, _: &vk::ImageView) {
+        
         // Render
         let compute = renderer.pipeline_store().get(self.pipeline.unwrap()).unwrap();
         command_buffer.bind_pipeline(&compute);
