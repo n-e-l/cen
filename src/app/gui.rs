@@ -1,35 +1,48 @@
-use std::sync::{Arc, Mutex, Weak};
 use ash::vk;
 use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, Format, Image, ImageLayout, ImageView, Offset2D, Rect2D, RenderingAttachmentInfo};
-use egui::{Context, ViewportId};
+use egui::{Context, RawInput, ViewportId};
 use egui_ash_renderer::{DynamicRendering, Options};
 use egui_winit::State;
-use winit::raw_window_handle::{HasDisplayHandle};
 use crate::app::Window;
 use crate::graphics::Renderer;
 use crate::graphics::renderer::RenderComponent;
 use crate::vulkan::{CommandBuffer};
 
 pub struct GuiComponent {
-    pub egui_ctx: Option<Context>,
-    pub egui_winit: Option<State>,
+    pub egui_ctx: Context,
+    pub egui_winit: State,
     pub egui_renderer: Option<egui_ash_renderer::Renderer>,
-    window: Weak<Mutex<Window>>,
+    raw_input: Option<RawInput>
 }
 
 impl GuiComponent {
 
-    pub fn new(window: Weak<Mutex<Window>>) -> Self {
+    pub fn new(window: &Window) -> Self {
+        
+        let egui_ctx = Context::default();
+        let egui_winit = egui_winit::State::new(
+            egui_ctx.clone(),
+            ViewportId::ROOT,
+            &window.display_handle(),
+            None,
+            None,
+            None
+        );
+        
         Self {
-            egui_ctx: None,
-            egui_winit: None,
+            egui_ctx,
+            egui_winit,
             egui_renderer: None,
-            window,
+            raw_input: None
         }
     }
 
     pub fn on_window_event(&mut self, window: &winit::window::Window, event: &winit::event::WindowEvent) {
-        let _ = self.egui_winit.as_mut().unwrap().on_window_event(window, event);
+        let _ = self.egui_winit.on_window_event(window, event);
+    }
+    
+    pub fn update(&mut self, window: &winit::window::Window) {
+        self.raw_input = Some(self.egui_winit.take_egui_input(window));
     }
 }
 
@@ -51,22 +64,13 @@ impl RenderComponent for GuiComponent {
             }
         ).unwrap());
 
-        self.egui_ctx = Some(Context::default());
-        self.egui_winit = Some(egui_winit::State::new(
-            self.egui_ctx.as_mut().unwrap().clone(),
-            ViewportId::ROOT,
-            &self.window.upgrade().unwrap().lock().unwrap().display_handle(),
-            None,
-            None,
-            None
-        ));
     }
 
     fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, _: &Image, swapchain_image_view: &ImageView) {
 
         // Renew gui
-        let raw_input = self.egui_winit.as_mut().unwrap().take_egui_input(&self.window.upgrade().unwrap().lock().unwrap().winit_window());
-        let mut egui_output = Some(self.egui_ctx.as_mut().unwrap().run(raw_input, |ctx| {
+        let raw_input = self.raw_input.take().unwrap();
+        let mut egui_output = Some(self.egui_ctx.run(raw_input, |ctx| {
             egui::Window::new("GUI")
                 .resizable(true)
                 .title_bar(true)
@@ -86,7 +90,7 @@ impl RenderComponent for GuiComponent {
                 renderer.queue, renderer.command_pool.command_pool, output.textures_delta.set.as_slice()
             ).unwrap();
 
-            let clipped_primitives = self.egui_ctx.as_mut().unwrap().tessellate(
+            let clipped_primitives = self.egui_ctx.tessellate(
                 output.shapes,
                 output.pixels_per_point
             );
