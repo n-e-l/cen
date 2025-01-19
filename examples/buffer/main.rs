@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use ash::vk;
 use ash::vk::{BufferImageCopy, BufferUsageFlags, Extent3D, ImageLayout, ImageSubresourceLayers};
 use gpu_allocator::MemoryLocation;
@@ -105,8 +106,12 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
-    App::run(AppConfig::default(), Box::new(ComputeRender {
-        buffer: None
-    }));
+    App::run(
+        AppConfig::default(), 
+         Arc::new(Mutex::new(ComputeRender {
+            buffer: None
+        })),
+        None
+    );
 }
 

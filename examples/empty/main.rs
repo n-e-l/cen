@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use ash::vk;
 use cen::app::app::{App, AppConfig};
 use cen::graphics::{Renderer};
@@ -16,6 +17,9 @@ impl RenderComponent for EmptyRend {
 }
 
 fn main() {
-    App::run(AppConfig::default(), Box::new(EmptyRend {
-    }));
+    App::run(
+        AppConfig::default(), 
+        Arc::new(Mutex::new(EmptyRend {})),
+        None
+    );
 }

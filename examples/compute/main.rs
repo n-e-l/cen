@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use cen::graphics::pipeline_store::{PipelineConfig, PipelineKey};
 use ash::vk;
 use ash::vk::WriteDescriptorSet;
@@ -188,9 +189,13 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
-    App::run(AppConfig::default(), Box::new(ComputeRender {
-        image: None,
-        descriptorset: None,
-        pipeline: None,
-    }));
+    App::run(
+        AppConfig::default(), 
+        Arc::new(Mutex::new(ComputeRender {
+            image: None,
+            descriptorset: None,
+            pipeline: None,
+        })),
+        None
+    );
 }
