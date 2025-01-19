@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use ash::vk;
 use ash::vk::{BufferImageCopy, BufferUsageFlags, Extent3D, ImageLayout, ImageSubresourceLayers};
 use gpu_allocator::MemoryLocation;
@@ -12,7 +13,6 @@ struct ComputeRender {
 }
 
 impl RenderComponent for ComputeRender {
-
     fn initialize(&mut self, renderer: &mut Renderer) {
         // Image
         let mut buffer = Buffer::new(
@@ -31,7 +31,7 @@ impl RenderComponent for ComputeRender {
         self.buffer = Some(buffer);
     }
 
-    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image) {
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image, _: &vk::ImageView) {
 
         // Transition the swapchain image
         renderer.transition_image(
@@ -65,7 +65,7 @@ impl RenderComponent for ComputeRender {
 
             renderer.device.handle().cmd_copy_buffer_to_image(
                 command_buffer.handle(),
-                *self.buffer.as_mut().unwrap().handle(),
+                *self.buffer.as_ref().unwrap().handle(),
                 *swapchain_image,
                 ImageLayout::TRANSFER_DST_OPTIMAL,
                 &[
@@ -106,6 +106,12 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
-    let cr = ComputeRender { buffer: None };
-    App::run(AppConfig::default(), Box::new(cr));
+    App::run(
+        AppConfig::default(),
+         Arc::new(Mutex::new(ComputeRender {
+            buffer: None
+        })),
+        None
+    );
 }
+

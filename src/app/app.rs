@@ -1,34 +1,30 @@
 use winit::application::ApplicationHandler;
 use std::path::{PathBuf};
-use std::time::{SystemTime};
+use std::sync::{Arc, Mutex};
 use env_logger::{Builder, Env};
-use log::{debug, error, info, LevelFilter};
+use log::{LevelFilter};
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoopBuilder, EventLoopProxy};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::window::WindowId;
-use crate::app::{Window};
-use crate::graphics::Renderer;
-use crate::graphics::renderer::{RenderComponent, WindowState};
+use crate::app::engine::Engine;
+use crate::app::gui::GuiComponent;
+use crate::graphics::renderer::{RenderComponent};
 
 pub struct App
 {
-    initialized: bool,
-    _start_time: SystemTime,
-    components: Box<dyn RenderComponent>,
-    renderer: Option<Renderer>,
-    window: Option<Window>,
-    frame_count: usize,
-    pub app_config: AppConfig,
-    last_print_time: SystemTime,
     pub proxy: EventLoopProxy<UserEvent>,
+    pub app_config: AppConfig,
+    pub render_component: Option<Arc<Mutex<dyn RenderComponent>>>,
+    pub gui_component: Option<Arc<Mutex<dyn GuiComponent>>>,
+    engine: Option<Engine>,
 }
 
 pub struct AppConfig {
-    width: u32,
-    height: u32,
-    vsync: bool,
-    log_fps: bool,
-    fullscreen: bool,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) vsync: bool,
+    pub(crate) log_fps: bool,
+    pub(crate) fullscreen: bool,
 }
 
 impl AppConfig {
@@ -79,75 +75,36 @@ pub enum UserEvent {
 
 impl ApplicationHandler<UserEvent> for App
 {
-    fn new_events(&mut self, _: &ActiveEventLoop, cause: StartCause) {
-        match cause {
-            | StartCause::Poll => {
-                self.renderer.as_mut().unwrap().draw_frame(self.components.as_mut());
-
-                if self.app_config.log_fps {
-                    let current_frame_time = SystemTime::now();
-                    let elapsed = current_frame_time.duration_since(self.last_print_time).unwrap();
-                    self.frame_count += 1;
-
-                    if elapsed.as_secs() >= 1 {
-                        info!("fps: {}, frametime: {:.3}ms", self.frame_count, elapsed.as_millis() as f32 / self.frame_count as f32);
-                        self.frame_count = 0;
-                        self.last_print_time = current_frame_time;
-                    }
-                }
-            }
-            _ => {}
+    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
+        if let Some(ref mut engine) = self.engine {
+            engine.new_events(event_loop, cause);
         }
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 
         // Prepare for multiple resume calls
-        if self.initialized {
-            return;
+        if let None = self.engine {
+            self.engine = Some(Engine::new(
+                self.proxy.clone(),
+                event_loop,
+                &self.app_config,
+                self.render_component.take().unwrap(),
+                self.gui_component.take()
+            ));
         }
-        self.initialized = true;
 
-        // Create the graphics context
-        let window = Window::create(&event_loop, "cen", self.app_config.width, self.app_config.height, self.app_config.fullscreen);
-        let window_state = WindowState {
-            window_handle: window.window_handle(),
-            display_handle: window.display_handle(),
-            extent2d: window.get_extent()
-        };
-
-        let mut renderer = Renderer::new(&window_state, self.proxy.clone(), self.app_config.vsync);
-
-        self.components.initialize(&mut renderer);
-
-        self.renderer = Some(renderer);
-
-        self.window = Some(window);
     }
 
-    fn user_event(&mut self, _: &ActiveEventLoop, event: UserEvent) {
-        match event {
-            | UserEvent::GlslUpdate(path) => {
-                debug!("Reloading shader: {:?}", path);
-
-                if let Err(e) = self.renderer.as_mut().unwrap().pipeline_store.reload(&path) {
-                    error!("{}", e);
-                }
-            }
-            _ => (),
+    fn user_event(&mut self, even_loop: &ActiveEventLoop, event: UserEvent) {
+        if let Some(engine) = self.engine.as_mut() {
+            engine.user_event(even_loop, event);
         }
     }
-
+    
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
-        self.window.as_mut().unwrap().window_event( event.clone(), event_loop );
-
-        match event {
-            WindowEvent::RedrawRequested => {
-                self.renderer.as_mut().unwrap().draw_frame(self.components.as_mut());
-            },
-            WindowEvent::Resized( _ ) => {
-            }
-            _ => (),
+        if let Some(engine) = self.engine.as_mut() {
+            engine.window_event(event_loop, event);
         }
     }
 
@@ -161,10 +118,9 @@ impl ApplicationHandler<UserEvent> for App
     }
 
     fn exiting(&mut self, _: &ActiveEventLoop) {
-
-        // Wait for all render operations to finish before exiting
-        // This ensures we can safely start dropping gpu resources
-        self.renderer.as_mut().unwrap().device.wait_idle();
+        if let Some(engine) = self.engine.take() {
+            engine.exit();
+        }
     }
 
     fn memory_warning(&mut self, _: &ActiveEventLoop) {
@@ -187,32 +143,32 @@ impl App {
             .filter(Some("mio::poll"), LevelFilter::Error)
             .filter(Some("sctk"), LevelFilter::Error)
             .filter(Some("notify_debouncer_mini"), LevelFilter::Error)
+            .filter(Some("egui_ash_renderer"), LevelFilter::Error)
             .init();
     }
-
-    pub fn run(app_config: AppConfig, render_component: Box<dyn RenderComponent>) {
+    
+    fn new(app_config: AppConfig, event_loop: &EventLoop<UserEvent>, render_component: Arc<Mutex<dyn RenderComponent>>, gui_component: Option<Arc<Mutex<dyn GuiComponent>>>) -> Self {
+        
+        let proxy = event_loop.create_proxy();
+        
+        App {
+            app_config,
+            proxy,
+            render_component: Some(render_component),
+            gui_component,
+            engine: None,
+        }
+    }
+    
+    pub fn run(app_config: AppConfig, render_component: Arc<Mutex<dyn RenderComponent>>, gui_component: Option<Arc<Mutex<dyn GuiComponent>>>) {
 
         Self::init_logger();
 
-        // App setup
-        let start_time = SystemTime::now();
-
         let event_loop = EventLoopBuilder::default().build().expect("Failed to create event loop.");
-
-        let mut app: App = App {
-            initialized: false,
-            window: None,
-            renderer: None,
-            components: render_component,
-            // gui_component: None,
-            _start_time: start_time,
-            frame_count: 0,
-            app_config,
-            last_print_time: SystemTime::now(),
-            proxy: event_loop.create_proxy(),
-        };
-
         event_loop.set_control_flow(ControlFlow::Poll);
+
+        // App setup
+        let mut app = App::new(app_config, &event_loop, render_component, gui_component);
         event_loop.run_app(&mut app).unwrap();
     }
 

@@ -75,6 +75,20 @@ impl CommandBuffer {
                 .cmd_begin_render_pass(self.inner.command_buffer, &render_pass_begin_info, vk::SubpassContents::INLINE);
         }
     }
+    
+    pub fn begin_rendering(&self, rendering_info: &vk::RenderingInfoKHR<'_>) {
+        unsafe {
+            self.inner.device_dep.dynamic_rendering_loader
+                .cmd_begin_rendering(self.inner.command_buffer, rendering_info);
+        }
+    }
+    
+    pub fn end_rendering(&self) {
+        unsafe {
+            self.inner.device_dep.dynamic_rendering_loader
+                .cmd_end_rendering(self.inner.command_buffer);
+        }
+    }
 
     pub fn bind_push_descriptor_images(&self, pipeline: &dyn Pipeline, images: &Vec<&Image>) {
         let bindings = images.iter().map(|image| {

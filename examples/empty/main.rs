@@ -1,4 +1,5 @@
-use ash::vk::Image;
+use std::sync::{Arc, Mutex};
+use ash::vk;
 use cen::app::app::{App, AppConfig};
 use cen::graphics::{Renderer};
 use cen::graphics::renderer::RenderComponent;
@@ -8,13 +9,17 @@ struct EmptyRend {
 }
 
 impl RenderComponent for EmptyRend {
-    fn initialize(&mut self, renderer: &mut Renderer) {
+    fn initialize(&mut self, _: &mut Renderer) {
     }
 
-    fn render(&mut self, _: &mut Renderer, _: &mut CommandBuffer, _: &Image) {
+    fn render(&mut self, _: &mut Renderer, _: &mut CommandBuffer, _: &vk::Image, _: &vk::ImageView) {
     }
 }
 
 fn main() {
-    App::run(AppConfig::default(), Box::new(EmptyRend{}));
+    App::run(
+        AppConfig::default(),
+        Arc::new(Mutex::new(EmptyRend {})),
+        None
+    );
 }

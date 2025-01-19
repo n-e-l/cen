@@ -10,7 +10,7 @@ use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Sur
 
 pub trait RenderComponent {
     fn initialize(&mut self, renderer: &mut Renderer);
-    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image);
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image, swapchain_image_view: &vk::ImageView);
 }
 
 pub struct Renderer {
@@ -155,14 +155,18 @@ impl Renderer {
         device.submit_single_time_command(*queue, &image_command_buffer);
     }
     
-    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_component: &mut dyn RenderComponent) {
+    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &mut [&mut dyn RenderComponent]) {
 
         let mut command_buffer = self.command_buffers[frame_index].clone();
 
         command_buffer.begin();
 
         let swapchain_image = self.swapchain.get_images()[image_index];
-        render_component.render( self, &mut command_buffer, &swapchain_image );
+        let swapchain_image_view = self.swapchain.get_image_views()[image_index];
+        
+        for rc in render_components.iter_mut() {
+            rc.render( self, &mut command_buffer, &swapchain_image, &swapchain_image_view );
+        }
 
         command_buffer.end();
     }
@@ -207,7 +211,7 @@ impl Renderer {
     }
 
 
-    pub fn draw_frame(&mut self, render_component: &mut dyn RenderComponent) {
+    pub fn draw_frame(&mut self, render_component: &mut [&mut dyn RenderComponent]) {
 
         // Wait for the current frame's command buffer to finish executing.
         self.device.wait_for_fence(self.in_flight_fences[self.frame_index]);

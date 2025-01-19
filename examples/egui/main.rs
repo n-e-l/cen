@@ -2,8 +2,10 @@ use std::sync::{Arc, Mutex};
 use cen::graphics::pipeline_store::{PipelineConfig, PipelineKey};
 use ash::vk;
 use ash::vk::WriteDescriptorSet;
+use egui::Context;
 use cen::app::App;
 use cen::app::app::AppConfig;
+use cen::app::gui::GuiComponent;
 use cen::graphics::Renderer;
 use cen::graphics::renderer::RenderComponent;
 use cen::vulkan::{CommandBuffer, DescriptorSetLayout, Image};
@@ -12,7 +14,9 @@ use cen::vulkan::{CommandBuffer, DescriptorSetLayout, Image};
 struct ComputeRender {
     image: Option<Image>,
     descriptorset: Option<DescriptorSetLayout>,
-    pipeline: Option<PipelineKey>,
+    pipeline_a: Option<PipelineKey>,
+    pipeline_b: Option<PipelineKey>,
+    pressed: bool,
 }
 
 impl RenderComponent for ComputeRender {
@@ -49,8 +53,17 @@ impl RenderComponent for ComputeRender {
         );
 
         // Pipeline
-        let pipeline = renderer.pipeline_store().insert(PipelineConfig {
-            shader_path: "examples/compute/shader.comp".into(),
+        let pipeline_a = renderer.pipeline_store().insert(PipelineConfig {
+            shader_path: "examples/egui/shader_a.comp".into(),
+            descriptor_set_layouts: vec![
+                descriptorset.clone(),
+            ],
+            push_constant_ranges: vec![],
+            macros: Default::default(),
+        }).expect("Failed to create pipeline");
+        
+        let pipeline_b = renderer.pipeline_store().insert(PipelineConfig {
+            shader_path: "examples/egui/shader_b.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
             ],
@@ -60,12 +73,19 @@ impl RenderComponent for ComputeRender {
 
         self.image = Some(image);
         self.descriptorset = Some(descriptorset);
-        self.pipeline = Some(pipeline);
+        self.pipeline_a = Some(pipeline_a);
+        self.pipeline_b = Some(pipeline_b);
     }
 
     fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image, _: &vk::ImageView) {
+        
         // Render
-        let compute = renderer.pipeline_store().get(self.pipeline.unwrap()).unwrap();
+        let compute = if !self.pressed {
+            renderer.pipeline_store().get(self.pipeline_a.unwrap()).unwrap()
+        } else {
+            renderer.pipeline_store().get(self.pipeline_b.unwrap()).unwrap()
+        };
+        
         command_buffer.bind_pipeline(&compute);
 
         let bindings = [self.image.as_ref().unwrap().binding(vk::ImageLayout::GENERAL)];
@@ -81,6 +101,7 @@ impl RenderComponent for ComputeRender {
             0,
             &[write_descriptor_set]
         );
+        
         command_buffer.dispatch(500, 500, 1 );
 
         // Transition the render to a source
@@ -188,14 +209,30 @@ impl RenderComponent for ComputeRender {
     }
 }
 
+impl GuiComponent for ComputeRender {
+    fn gui(&mut self, ctx: &Context) {
+        egui::Window::new("Shader controls")
+            .resizable(true)
+            .title_bar(true)
+            .show(ctx, |ui| {
+                ui.checkbox(&mut self.pressed, "Alt");
+            }
+        );
+    }
+}
+
 fn main() {
+    
+    let compute = Arc::new(Mutex::new(ComputeRender {
+        image: None,
+        descriptorset: None,
+        pipeline_a: None,
+        pipeline_b: None,
+        pressed: false,
+    }));
     App::run(
         AppConfig::default(), 
-        Arc::new(Mutex::new(ComputeRender {
-            image: None,
-            descriptorset: None,
-            pipeline: None,
-        })),
-        None
+        compute.clone(),
+        Some(compute)
     );
 }
