@@ -107,7 +107,7 @@ impl RenderComponent for ComputeRender {
 
 fn main() {
     App::run(
-        AppConfig::default(), 
+        AppConfig::default(),
          Arc::new(Mutex::new(ComputeRender {
             buffer: None
         })),

@@ -1,6 +1,6 @@
 [package]
 name = "cen"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 authors = ["Angelo Carly <angelo.carly@protonmail.com"]
 description = "Vulkan window backend"
@@ -14,7 +14,7 @@ categories = ["rendering::engine"]
 ash = { version = "0.38.0", features = ["linked"] }
 ash-window = "0.13.0"
 winit = "0.30.8"
-shaderc = "0.8.3"
+shaderc = { version = "0.8.3", features = ["build-from-source"] }
 log = "0.4.21"
 env_logger = "0.11.5"
 gpu-allocator = { version = "0.27.0" }

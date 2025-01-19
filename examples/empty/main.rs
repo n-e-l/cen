@@ -18,7 +18,7 @@ impl RenderComponent for EmptyRend {
 
 fn main() {
     App::run(
-        AppConfig::default(), 
+        AppConfig::default(),
         Arc::new(Mutex::new(EmptyRend {})),
         None
     );
