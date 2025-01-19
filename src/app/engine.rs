@@ -1,7 +1,6 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::{DerefMut};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
-use egui::Context;
 use log::{debug, error, info};
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
@@ -80,7 +79,7 @@ impl Engine {
         }
     }
     
-    pub fn new(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig, mut user_component: Arc<Mutex<dyn RenderComponent>>, gui_component: Option<Arc<Mutex<dyn GuiComponent>>>) -> Engine {
+    pub fn new(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig, user_component: Arc<Mutex<dyn RenderComponent>>, gui_component: Option<Arc<Mutex<dyn GuiComponent>>>) -> Engine {
         // Create the graphics context
         let window = Box::new(Window::create(&event_loop, "cen", app_config.width, app_config.height, app_config.fullscreen));
 

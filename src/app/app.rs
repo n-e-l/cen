@@ -1,7 +1,6 @@
 use winit::application::ApplicationHandler;
 use std::path::{PathBuf};
 use std::sync::{Arc, Mutex};
-use egui::Context;
 use env_logger::{Builder, Env};
 use log::{LevelFilter};
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
