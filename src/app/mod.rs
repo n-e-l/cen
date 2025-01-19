@@ -1,6 +1,6 @@
 pub mod app;
 pub mod window;
-mod gui;
+pub mod gui;
 mod engine;
 
 pub use self::app::App;

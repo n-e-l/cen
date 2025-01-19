@@ -1,9 +1,12 @@
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
+use egui::Context;
 use log::{debug, error, info};
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use crate::app::app::{AppConfig, UserEvent};
-use crate::app::gui::GuiComponent;
+use crate::app::gui::{GuiComponent, GuiSystem};
 use crate::app::Window;
 use crate::graphics::Renderer;
 use crate::graphics::renderer::{RenderComponent, WindowState};
@@ -11,8 +14,9 @@ use crate::graphics::renderer::{RenderComponent, WindowState};
 pub struct Engine {
     _start_time: SystemTime,
     window: Box<Window>,
-    component: Box<dyn RenderComponent>,
-    gui_component: GuiComponent,
+    component: Arc<Mutex<dyn RenderComponent>>,
+    gui: Option<Arc<Mutex<dyn GuiComponent>>>,
+    gui_system: GuiSystem,
     renderer: Renderer,
     frame_count: usize,
     last_print_time: SystemTime,
@@ -29,7 +33,7 @@ impl Engine {
     pub(crate) fn window_event(&mut self, event_loop: &ActiveEventLoop, event: WindowEvent) {
         self.window.window_event( event.clone(), event_loop );
 
-        self.gui_component.on_window_event(self.window.winit_window(), &event);
+        self.gui_system.on_window_event(self.window.winit_window(), &event);
 
         match event {
             WindowEvent::RedrawRequested => {
@@ -76,7 +80,7 @@ impl Engine {
         }
     }
     
-    pub fn new(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig, mut user_component: Box<dyn RenderComponent>) -> Engine {
+    pub fn new(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig, mut user_component: Arc<Mutex<dyn RenderComponent>>, gui_component: Option<Arc<Mutex<dyn GuiComponent>>>) -> Engine {
         // Create the graphics context
         let window = Box::new(Window::create(&event_loop, "cen", app_config.width, app_config.height, app_config.fullscreen));
 
@@ -90,30 +94,36 @@ impl Engine {
         let mut renderer = Renderer::new(&window_state, proxy, app_config.vsync);
 
         // Add gui component (wip)
-        user_component.initialize(&mut renderer);
-        let mut gui_component = GuiComponent::new(window.as_ref());
-        gui_component.initialize(&mut renderer);
+        user_component.lock().unwrap().initialize(&mut renderer);
+        let mut gui_system = GuiSystem::new(window.as_ref());
+        gui_system.initialize(&mut renderer);
         
         Engine {
             _start_time: SystemTime::now(),
             window,
             renderer,
-            gui_component,
+            gui_system,
             frame_count: 0,
             last_print_time: SystemTime::now(),
             component: user_component,
-            log_fps: app_config.log_fps
+            log_fps: app_config.log_fps,
+            gui: gui_component,
         }
     }
     
     pub fn update(&mut self) {
-        self.gui_component.update(self.window.winit_window());
+        if let Some(gui) = &self.gui {
+            self.gui_system.update(
+                self.window.winit_window(),
+                &mut [gui.lock().unwrap().deref_mut()]
+            );
+        }
     }
     
     pub fn draw(&mut self) {
         self.renderer.draw_frame(&mut [
-            self.component.as_mut(),
-            &mut self.gui_component
+            self.component.lock().unwrap().deref_mut(),
+            &mut self.gui_system
         ]);
     }
 }

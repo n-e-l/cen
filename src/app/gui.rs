@@ -1,6 +1,6 @@
 use ash::vk;
 use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, Format, Image, ImageLayout, ImageView, Offset2D, Rect2D, RenderingAttachmentInfo};
-use egui::{Context, RawInput, ViewportId};
+use egui::{Context, FullOutput, RawInput, ViewportId};
 use egui_ash_renderer::{DynamicRendering, Options};
 use egui_winit::State;
 use crate::app::Window;
@@ -8,14 +8,19 @@ use crate::graphics::Renderer;
 use crate::graphics::renderer::RenderComponent;
 use crate::vulkan::{CommandBuffer};
 
-pub struct GuiComponent {
+pub trait GuiComponent {
+    fn gui(&mut self, context: &Context);
+}
+
+pub struct GuiSystem {
     pub egui_ctx: Context,
     pub egui_winit: State,
     pub egui_renderer: Option<egui_ash_renderer::Renderer>,
-    raw_input: Option<RawInput>
+    raw_input: Option<RawInput>,
+    egui_output: Option<FullOutput>
 }
 
-impl GuiComponent {
+impl GuiSystem {
 
     pub fn new(window: &Window) -> Self {
         
@@ -33,7 +38,8 @@ impl GuiComponent {
             egui_ctx,
             egui_winit,
             egui_renderer: None,
-            raw_input: None
+            raw_input: None,
+            egui_output: None
         }
     }
 
@@ -41,12 +47,20 @@ impl GuiComponent {
         let _ = self.egui_winit.on_window_event(window, event);
     }
     
-    pub fn update(&mut self, window: &winit::window::Window) {
+    pub fn update(&mut self, window: &winit::window::Window, components: &mut [&mut dyn GuiComponent]) {
         self.raw_input = Some(self.egui_winit.take_egui_input(window));
+        
+        // Renew gui
+        let raw_input = self.raw_input.take().unwrap();
+        self.egui_output = Some(self.egui_ctx.run(raw_input, |ctx| {
+            for component in &mut *components {
+                component.gui(ctx);
+            }
+        }));
     }
 }
 
-impl RenderComponent for GuiComponent {
+impl RenderComponent for GuiSystem {
 
     fn initialize(&mut self, renderer: &mut Renderer) {
         self.egui_renderer = Some(egui_ash_renderer::Renderer::with_gpu_allocator(
@@ -68,21 +82,7 @@ impl RenderComponent for GuiComponent {
 
     fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, _: &Image, swapchain_image_view: &ImageView) {
 
-        // Renew gui
-        let raw_input = self.raw_input.take().unwrap();
-        let mut egui_output = Some(self.egui_ctx.run(raw_input, |ctx| {
-            egui::Window::new("GUI")
-                .resizable(true)
-                .title_bar(true)
-                .show(ctx, |ui| {
-                    if ui.button("test button!").clicked() {
-                        
-                    }
-                }
-            );
-        }));
-
-        if let Some(output) = egui_output.take() {
+        if let Some(output) = self.egui_output.take() {
 
             // Set textures
             // https://docs.rs/egui-ash-renderer/0.7.0/egui_ash_renderer/#managed-textures
