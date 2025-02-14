@@ -92,8 +92,9 @@ impl Engine {
 
         let mut renderer = Renderer::new(&window_state, proxy, app_config.vsync);
 
-        // Add gui component (wip)
         user_component.lock().unwrap().initialize(&mut renderer);
+        
+        // Initialize gui renderer
         let mut gui_system = GuiSystem::new(window.as_ref());
         gui_system.initialize(&mut renderer);
         
