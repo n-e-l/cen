@@ -47,9 +47,21 @@ impl Swapchain {
 
         let available_formats = surface.get_formats(physical_device);
         let surface_format = available_formats.iter()
-            .find(|f| f == &&vk::SurfaceFormatKHR {
-                format: vk::Format::R8G8B8A8_UNORM,
-                color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+            .find(|f| {
+                #[cfg(target_os = "windows")]
+                #[cfg(target_os = "linux")]
+                let preferred_format = &&vk::SurfaceFormatKHR {
+                    format: vk::Format::R8G8B8A8_SRGB,
+                    color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+                };
+                
+                #[cfg(target_os = "macos")]
+                let preferred_format = &&vk::SurfaceFormatKHR {
+                    format: vk::Format::B8G8R8A8_SRGB,
+                    color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+                };
+                
+                f == preferred_format
             })
             .unwrap_or(available_formats.first().expect("No surface format found"));
 
@@ -57,7 +69,7 @@ impl Swapchain {
 
         let surface_capabilities = surface.get_surface_capabilities(physical_device);
 
-        let mut desired_image_count = surface_capabilities.min_image_count + 1;
+        let mut desired_image_count = surface_capabilities.min_image_count + 0;
         // Max image count can be 0
         if surface_capabilities.max_image_count > 0 && desired_image_count > surface_capabilities.max_image_count {
             desired_image_count = surface_capabilities.max_image_count;

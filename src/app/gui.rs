@@ -48,10 +48,9 @@ impl GuiSystem {
     }
     
     pub fn update(&mut self, window: &winit::window::Window, components: &mut [&mut dyn GuiComponent]) {
-        self.raw_input = Some(self.egui_winit.take_egui_input(window));
-        
+
         // Renew gui
-        let raw_input = self.raw_input.take().unwrap();
+        let raw_input = self.egui_winit.take_egui_input(window);
         self.egui_output = Some(self.egui_ctx.run(raw_input, |ctx| {
             for component in &mut *components {
                 component.gui(ctx);
@@ -67,7 +66,7 @@ impl RenderComponent for GuiSystem {
             renderer.allocator.inner.lock().unwrap().allocator.clone(),
             renderer.device.handle().clone(),
             DynamicRendering {
-                color_attachment_format: Format::B8G8R8A8_UNORM,
+                color_attachment_format: Format::B8G8R8A8_SRGB,
                 depth_attachment_format: None,
             },
             Options {
@@ -84,6 +83,10 @@ impl RenderComponent for GuiSystem {
 
         if let Some(output) = self.egui_output.take() {
 
+            // Free textures
+            self.egui_renderer.as_mut().unwrap()
+                .free_textures(output.textures_delta.free.as_slice()).unwrap();
+
             // Set textures
             // https://docs.rs/egui-ash-renderer/0.7.0/egui_ash_renderer/#managed-textures
             self.egui_renderer.as_mut().unwrap().set_textures(
@@ -97,7 +100,7 @@ impl RenderComponent for GuiSystem {
 
             let color_attachments = vec![
                 RenderingAttachmentInfo::default()
-                    .image_layout(ImageLayout::GENERAL)
+                    .image_layout(ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                     .load_op(AttachmentLoadOp::LOAD)
                     .store_op(AttachmentStoreOp::STORE)
                     .clear_value(ClearValue { color: ClearColorValue { float32: [1f32, 0f32, 1f32, 1f32] } })
