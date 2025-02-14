@@ -48,8 +48,7 @@ impl Swapchain {
         let available_formats = surface.get_formats(physical_device);
         let surface_format = available_formats.iter()
             .find(|f| {
-                #[cfg(target_os = "windows")]
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "windows"))]
                 let preferred_format = &&vk::SurfaceFormatKHR {
                     format: vk::Format::R8G8B8A8_SRGB,
                     color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,

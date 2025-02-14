@@ -62,11 +62,18 @@ impl GuiSystem {
 impl RenderComponent for GuiSystem {
 
     fn initialize(&mut self, renderer: &mut Renderer) {
+
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        let preferred_format = vk::Format::B8G8R8A8_SRGB;
+
+        #[cfg(target_os = "macos")]
+        let preferred_format = vk::Format::B8G8R8A8_SRGB;
+
         self.egui_renderer = Some(egui_ash_renderer::Renderer::with_gpu_allocator(
             renderer.allocator.inner.lock().unwrap().allocator.clone(),
             renderer.device.handle().clone(),
             DynamicRendering {
-                color_attachment_format: Format::B8G8R8A8_SRGB,
+                color_attachment_format: preferred_format,
                 depth_attachment_format: None,
             },
             Options {
