@@ -64,7 +64,7 @@ impl RenderComponent for GuiSystem {
     fn initialize(&mut self, renderer: &mut Renderer) {
 
         #[cfg(any(target_os = "linux", target_os = "windows"))]
-        let preferred_format = vk::Format::B8G8R8A8_SRGB;
+        let preferred_format = vk::Format::R8G8B8A8_SRGB;
 
         #[cfg(target_os = "macos")]
         let preferred_format = vk::Format::B8G8R8A8_SRGB;
