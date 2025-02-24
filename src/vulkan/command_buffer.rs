@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::{DeviceSize, WriteDescriptorSet};
+use ash::vk::{BufferImageCopy, DeviceSize, ImageLayout, WriteDescriptorSet};
 use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, GpuHandle, Image, Pipeline, RenderPass};
 use crate::vulkan::device::DeviceInner;
 
@@ -225,6 +225,21 @@ impl CommandBuffer {
                     offset,
                     size,
                     data
+                );
+        }
+        // TODO: Add reference watching to buffers
+        // self.inner.resource_handles.lock().expect("Failed to lock mutex").push(buffer.reference())
+    }
+    
+    pub fn copy_image_to_buffer(&self, image: &Image, layout: ImageLayout, buffer: &Buffer, regions: &[BufferImageCopy]) {
+        unsafe {
+            self.inner.device_dep.device
+                .cmd_copy_image_to_buffer(
+                    self.inner.command_buffer,
+                    *image.handle(),
+                    layout,
+                    *buffer.handle(),
+                    regions
                 );
         }
         // TODO: Add reference watching to buffers
