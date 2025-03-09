@@ -231,7 +231,7 @@ impl Renderer {
             });
             
             // Remove and execute callbacks
-            for i in remove_indices.iter() {
+            for i in remove_indices.iter().rev() {
                 let (f, _, callback) = self.cb_callbacks.swap_remove(*i);
                 
                 callback();
