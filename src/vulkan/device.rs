@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use ash::khr::swapchain;
 use ash::vk;
-use ash::vk::{PipelineStageFlags, Queue};
+use ash::vk::{Fence, PipelineStageFlags, Queue};
 use log::trace;
 use crate::vulkan::{CommandBuffer, Instance, LOG_TARGET};
 use crate::vulkan::instance::InstanceInner;
@@ -110,6 +110,14 @@ impl Device {
         }
     }
 
+    pub fn get_fence_status(&self, fence: vk::Fence) -> bool {
+        unsafe {
+            self.handle()
+                .get_fence_status(fence)
+                .expect("Failed to destroy fence")
+        }
+    }
+
     pub fn reset_fence(&self, fence: vk::Fence) {
         unsafe {
             let fences = [fence];
@@ -123,7 +131,7 @@ impl Device {
         &self,
         queue: Queue,
         command_buffer: &CommandBuffer
-    ) {
+    ) -> Fence {
         unsafe {
             let command_buffers = [command_buffer.handle()];
             let submit_info = vk::SubmitInfo::default()
@@ -136,11 +144,8 @@ impl Device {
 
             let submits = [submit_info];
             self.handle().queue_submit(queue, &submits, fence).unwrap();
-
-            self.wait_for_fence(fence);
-
-            self.handle()
-                .destroy_fence(fence, None);
+            
+            fence
         }
     }
 

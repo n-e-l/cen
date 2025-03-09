@@ -37,7 +37,7 @@ impl RenderComponent for ComputeRender {
             renderer.transition_image(&image_command_buffer, image.handle(), vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty(), vk::AccessFlags::empty());
         }
         image_command_buffer.end();
-        renderer.device.submit_single_time_command(renderer.queue, &image_command_buffer);
+        renderer.submit_single_time_command_buffer(image_command_buffer, Box::new(|| {}));
 
         // Layout
         let layout_bindings = &[

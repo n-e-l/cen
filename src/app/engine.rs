@@ -121,6 +121,7 @@ impl Engine {
     }
     
     pub fn draw(&mut self) {
+        self.renderer.update();
         self.renderer.draw_frame(&mut [
             self.component.lock().unwrap().deref_mut(),
             &mut self.gui_system

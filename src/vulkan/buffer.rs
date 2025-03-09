@@ -1,6 +1,5 @@
 use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::DeviceSize;
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
 use log::trace;

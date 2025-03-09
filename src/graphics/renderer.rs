@@ -1,6 +1,6 @@
 use std::time::Instant;
 use ash::vk;
-use ash::vk::{Extent2D, FenceCreateFlags, ImageAspectFlags, PhysicalDevice, Queue};
+use ash::vk::{Extent2D, Fence, FenceCreateFlags, ImageAspectFlags, PhysicalDevice, Queue};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
 use winit::raw_window_handle::{DisplayHandle, WindowHandle};
@@ -30,6 +30,7 @@ pub struct Renderer {
     pub physical_device: PhysicalDevice,
     pub instance: Instance,
     pub start_time: Instant,
+    cb_callbacks: Vec<(Fence, CommandBuffer, Box<dyn FnOnce()>)>
 }
 
 pub struct WindowState<'a> {
@@ -115,6 +116,7 @@ impl Renderer {
             pipeline_store,
             frame_index: 0,
             start_time,
+            cb_callbacks: Default::default()
         }
     }
 
@@ -152,7 +154,14 @@ impl Renderer {
             }
         });
         image_command_buffer.end();
-        device.submit_single_time_command(*queue, &image_command_buffer);
+        
+        let fence = device.submit_single_time_command(*queue, &image_command_buffer);
+        device.wait_for_fence(fence);
+
+        unsafe {
+            device.handle()
+                .destroy_fence(fence, None);
+        }
     }
     
     fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &mut [&mut dyn RenderComponent]) {
@@ -210,6 +219,26 @@ impl Renderer {
         }
     }
 
+    pub fn update(&mut self) {
+        // Update cb_callbacks
+        unsafe {
+            // Get the indices to remove
+            let mut remove_indices = Vec::new();
+            self.cb_callbacks.iter().enumerate().for_each(|(index, (f, _cb, _callback))| {
+                if self.device.get_fence_status(*f) {
+                    remove_indices.push(index);
+                }
+            });
+            
+            // Remove and execute callbacks
+            for i in remove_indices.iter() {
+                let (f, _, callback) = self.cb_callbacks.swap_remove(*i);
+                
+                callback();
+                self.device.handle().destroy_fence(f, None);
+            }
+        }
+    }
 
     pub fn draw_frame(&mut self, render_component: &mut [&mut dyn RenderComponent]) {
 
@@ -240,6 +269,22 @@ impl Renderer {
 
     pub fn pipeline_store(&mut self) -> &mut PipelineStore {
         &mut self.pipeline_store
+    }
+
+    pub fn create_command_buffer(&mut self) -> CommandBuffer {
+        CommandBuffer::new(&self.device, &self.command_pool)
+    }
+
+    pub fn submit_single_time_command_buffer(&mut self, command_buffer: CommandBuffer, callback: Box<dyn FnOnce()>) {
+
+        // Transmit
+        let fence = self.device.submit_single_time_command(
+            self.queue,
+            &command_buffer
+        );
+
+        // Store for callback
+        self.cb_callbacks.push((fence, command_buffer, callback));
     }
 }
 

@@ -1,6 +1,6 @@
 use ash::vk;
-use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, Format, Image, ImageLayout, ImageView, Offset2D, Rect2D, RenderingAttachmentInfo};
-use egui::{Context, FullOutput, RawInput, ViewportId};
+use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, Image, ImageLayout, ImageView, Offset2D, Rect2D, RenderingAttachmentInfo};
+use egui::{Context, FullOutput, ViewportId};
 use egui_ash_renderer::{DynamicRendering, Options};
 use egui_winit::State;
 use crate::app::Window;
@@ -16,7 +16,6 @@ pub struct GuiSystem {
     pub egui_ctx: Context,
     pub egui_winit: State,
     pub egui_renderer: Option<egui_ash_renderer::Renderer>,
-    raw_input: Option<RawInput>,
     egui_output: Option<FullOutput>
 }
 
@@ -38,7 +37,6 @@ impl GuiSystem {
             egui_ctx,
             egui_winit,
             egui_renderer: None,
-            raw_input: None,
             egui_output: None
         }
     }
