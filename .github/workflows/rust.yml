@@ -17,8 +17,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Vulkan SDK
-      uses: humbletim/setup-vulkan-sdk@v1.2.0
 
     - name: Build
       run: cargo build --verbose
