@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use ash::vk;
-use egui_ash_renderer::vulkan::create_vulkan_descriptor_pool;
 use log::trace;
 use crate::vulkan::{Device, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
@@ -14,7 +13,15 @@ impl DescriptorPool {
 
     pub fn new(device: &Device, max_sets: u32) -> DescriptorPool {
 
-        let descriptor_pool = create_vulkan_descriptor_pool(device.handle(), max_sets).unwrap();
+        let sizes = [vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            descriptor_count: max_sets,
+        }];
+        let create_info = vk::DescriptorPoolCreateInfo::default()
+            .pool_sizes(&sizes)
+            .max_sets(max_sets)
+            .flags(vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET);
+        let descriptor_pool = unsafe { device.handle().create_descriptor_pool(&create_info, None).unwrap() };
 
         trace!(target: LOG_TARGET, "Created descriptor pool: {:?}", descriptor_pool);
 
