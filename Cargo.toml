@@ -26,6 +26,7 @@ slotmap = "1.0.7"
 egui-ash-renderer = { version = "0.7.0", features = ["gpu-allocator", "dynamic-rendering"] }
 egui = "0.30.0"
 egui-winit = "0.30.0"
+egui_extras = { version = "0.30.0", features = ["all_loaders"] }
 
 [dev-dependencies]
 

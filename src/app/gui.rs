@@ -27,6 +27,12 @@ impl GuiSystem {
     pub fn new(window: &Window) -> Self {
         
         let egui_ctx = Context::default();
+
+        // Enable image loading
+        // You will still need to add a loader to your imports. e.g.
+        // image = { version = "0.25", features = ["png"] }
+        egui_extras::install_image_loaders(&egui_ctx);
+
         let egui_winit = egui_winit::State::new(
             egui_ctx.clone(),
             ViewportId::ROOT,
