@@ -1,13 +1,13 @@
 use ash::vk;
-use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorPool, DescriptorSet, Image, ImageLayout, ImageView, Offset2D, Rect2D, RenderingAttachmentInfo};
+use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, Image, ImageLayout, ImageView, Offset2D, Rect2D, RenderingAttachmentInfo};
 use egui::{Context, FullOutput, ViewportId};
 use egui_ash_renderer::{DynamicRendering, Options};
-use egui_ash_renderer::vulkan::{create_vulkan_descriptor_pool, create_vulkan_descriptor_set, create_vulkan_descriptor_set_layout};
+use egui_ash_renderer::vulkan::{create_vulkan_descriptor_set, create_vulkan_descriptor_set_layout};
 use egui_winit::State;
 use crate::app::Window;
 use crate::graphics::Renderer;
 use crate::graphics::renderer::RenderComponent;
-use crate::vulkan::{CommandBuffer, Device};
+use crate::vulkan::{CommandBuffer, Device, DescriptorPool};
 
 pub trait GuiComponent {
     fn gui(&mut self, gui: &GuiSystem, context: &Context);
@@ -18,8 +18,16 @@ pub struct GuiSystem {
     pub egui_winit: State,
     pub egui_renderer: Option<egui_ash_renderer::Renderer>,
     device: Option<Device>,
-    egui_output: Option<FullOutput>,
     renderer_descriptor_pool: Option<DescriptorPool>,
+    egui_output: Option<FullOutput>,
+}
+
+impl Drop for GuiSystem {
+    fn drop(&mut self) {
+        if let Some(renderer) = self.egui_renderer.take() {
+            drop(renderer);
+        }
+    }
 }
 
 impl GuiSystem {
@@ -58,7 +66,7 @@ impl GuiSystem {
         create_vulkan_descriptor_set(
             device,
             layout,
-            self.renderer_descriptor_pool.unwrap(),
+            self.renderer_descriptor_pool.as_ref().unwrap().handle(),
             image_view,
             sampler,
         ).unwrap()
@@ -85,7 +93,7 @@ impl RenderComponent for GuiSystem {
     fn initialize(&mut self, renderer: &mut Renderer) {
         
         self.device = Some(renderer.device.clone());
-        self.renderer_descriptor_pool = Some(create_vulkan_descriptor_pool(renderer.device.handle(), 10000).unwrap());
+        self.renderer_descriptor_pool = Some(DescriptorPool::new(&renderer.device, 10000));
 
         #[cfg(any(target_os = "linux", target_os = "windows"))]
         let preferred_format = vk::Format::R8G8B8A8_SRGB;

@@ -14,6 +14,7 @@ mod descriptor_set_layout;
 mod allocator;
 mod buffer;
 mod memory;
+mod descriptor_pool;
 
 pub(crate) const LOG_TARGET: &'static str = "cen::vulkan";
 
@@ -24,6 +25,7 @@ pub use self::command_pool::CommandPool;
 pub use self::compute_pipeline::ComputePipeline;
 pub use self::device::Device;
 pub use self::descriptor_set_layout::DescriptorSetLayout;
+pub use self::descriptor_pool::DescriptorPool;
 pub use self::framebuffer::Framebuffer;
 pub use self::graphics_pipeline::GraphicsPipeline;
 pub use self::image::Image;
