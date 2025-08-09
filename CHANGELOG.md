@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.7](https://github.com/n-e-l/cen/compare/v0.0.6...v0.0.7) - 2025-08-09
+
+### Other
+
+- Provide sampler and imageview
+- Create a descriptor pool without ash renderer bindings
+- Add descriptor pool handle and clean up loose destructor
+
 ## [0.0.6](https://github.com/n-e-l/cen/compare/v0.0.5...v0.0.6) - 2025-08-08
 
 ### Other
