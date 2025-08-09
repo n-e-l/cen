@@ -132,4 +132,12 @@ impl Image {
     pub fn handle(&self) -> &vk::Image {
         &self.image
     }
+    
+    pub fn image_view(&self) -> vk::ImageView {
+        self.image_view
+    }
+    
+    pub fn sampler(&self) -> vk::Sampler {
+        self.sampler
+    }
 }
