@@ -227,10 +227,27 @@ impl CommandBuffer {
                     data
                 );
         }
-        // TODO: Add reference watching to buffers
-        // self.inner.resource_handles.lock().expect("Failed to lock mutex").push(buffer.reference())
+        
+        let mut lock = self.inner.resource_handles.lock().expect("Failed to lock mutex");
+        lock.push(buffer.reference());
     }
-    
+
+    pub fn copy_buffer_to_image(&self, buffer: &Buffer, image: &Image, layout: ImageLayout, regions: &[BufferImageCopy]) {
+        unsafe {
+            self.inner.device_dep.device
+                .cmd_copy_buffer_to_image(
+                    self.inner.command_buffer,
+                    *buffer.handle(),
+                    *image.handle(),
+                    layout,
+                    regions
+                );
+        }
+        
+        let mut lock = self.inner.resource_handles.lock().expect("Failed to lock mutex");
+        lock.push(buffer.reference());
+    }
+
     pub fn copy_image_to_buffer(&self, image: &Image, layout: ImageLayout, buffer: &Buffer, regions: &[BufferImageCopy]) {
         unsafe {
             self.inner.device_dep.device
@@ -242,8 +259,9 @@ impl CommandBuffer {
                     regions
                 );
         }
-        // TODO: Add reference watching to buffers
-        // self.inner.resource_handles.lock().expect("Failed to lock mutex").push(buffer.reference())
+        
+        let mut lock = self.inner.resource_handles.lock().expect("Failed to lock mutex");
+        lock.push(buffer.reference());
     }
     
     pub fn buffer_barrier(

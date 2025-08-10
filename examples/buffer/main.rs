@@ -23,9 +23,11 @@ impl RenderComponent for ComputeRender {
             BufferUsageFlags::TRANSFER_SRC
         );
 
-        let mem = buffer.mapped();
-        for i in mem {
-            *i = 255u8;
+        {
+            let mut mem = buffer.mapped().unwrap();
+            for i in mem.as_mut_slice() {
+                *i = 255u8;
+            }
         }
 
         self.buffer = Some(buffer);

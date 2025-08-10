@@ -99,7 +99,9 @@ impl Engine {
         gui_system.initialize(&mut renderer);
         
         // Initialize gui component
-        gui_component.as_ref().unwrap().lock().as_mut().unwrap().initialize_gui(&mut gui_system);
+        if let Some(gui) = gui_component.as_ref() {
+            gui.lock().as_mut().unwrap().initialize_gui(&mut gui_system);
+        }
 
         Engine {
             _start_time: SystemTime::now(),

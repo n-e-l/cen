@@ -1,25 +1,29 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use ash::vk;
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
-use log::trace;
-use crate::vulkan::{Allocator, Device, LOG_TARGET};
+use log::{error, trace};
+use crate::vulkan::{Allocator, Device, GpuHandle, LOG_TARGET};
 use crate::vulkan::allocator::AllocatorInner;
 use crate::vulkan::device::DeviceInner;
 
-pub struct Buffer {
+pub struct BufferInner {
     pub device_dep: Arc<DeviceInner>,
     pub allocator_dep: Arc<Mutex<AllocatorInner>>,
     pub(crate) buffer: vk::Buffer,
     pub size: vk::DeviceSize,
-    pub allocation: Option<Allocation>,
+    pub allocation: Mutex<Option<Allocation>>,
 }
 
-impl Drop for Buffer {
+pub struct Buffer {
+    inner: Arc<BufferInner>,
+}
+
+impl Drop for BufferInner {
     fn drop(&mut self) {
         unsafe {
             let buffer_addr = format!("{:?}", self.buffer);
-            if let Some(allocation) = self.allocation.take() {
+            if let Some(allocation) = self.allocation.lock().unwrap().take() {
                 let memory_addr = format!("{:?}, {:?}", allocation.memory(), allocation.chunk_id());
                 self.allocator_dep.lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
                 trace!(target: LOG_TARGET, "Destroyed buffer memory: [{}]", memory_addr)
@@ -30,7 +34,13 @@ impl Drop for Buffer {
     }
 }
 
+impl GpuHandle for BufferInner {}
+
 impl Buffer {
+    pub(crate) fn reference(&self) -> Arc<dyn GpuHandle> {
+        self.inner.clone()
+    }
+
     pub fn new(device: &Device, allocator: &mut Allocator, location: MemoryLocation, size: vk::DeviceSize, buffer_usage_flags: vk::BufferUsageFlags) -> Buffer {
 
         // Image
@@ -63,26 +73,57 @@ impl Buffer {
         }
 
         Buffer {
-            buffer,
-            size,
-            allocation: Some(allocation),
-            device_dep: device.inner.clone(),
-            allocator_dep: allocator.inner.clone(),
+            inner: Arc::new(BufferInner {
+                buffer,
+                size,
+                allocation: Mutex::new(Some(allocation)),
+                device_dep: device.inner.clone(),
+                allocator_dep: allocator.inner.clone(),
+            })
         }
     }
 
-    pub fn mapped(&mut self) -> &mut [u8] {
-        self.allocation.as_mut().unwrap().mapped_slice_mut().expect("Failed to map memory")
+    pub fn mapped(&self) -> Result<MappedBufferGuard, BufferError> {
+
+        let allocation_guard = self.inner.allocation.lock().unwrap();
+
+        if let Some(ref allocation) = *allocation_guard {
+            if allocation.mapped_ptr().is_some() {
+                return Ok(MappedBufferGuard {
+                    _guard: allocation_guard,
+                });
+            } else {
+                return Err(BufferError::NotMapped);
+            }
+        }
+        
+        Err(BufferError::NotAllocated)
     }
 
     pub fn binding(&self) -> vk::DescriptorBufferInfo {
        vk::DescriptorBufferInfo::default()
-           .buffer(self.buffer)
+           .buffer(self.inner.buffer)
            .offset(0)
-           .range(self.size)
+           .range(self.inner.size)
     }
 
     pub fn handle(&self) -> &vk::Buffer {
-        &self.buffer
+        &self.inner.buffer
     }
+}
+
+pub struct MappedBufferGuard<'a> {
+    _guard: MutexGuard<'a, Option<Allocation>>,
+}
+
+impl<'a> MappedBufferGuard<'a> {
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        self._guard.as_mut().unwrap().mapped_slice_mut().expect("Failed to map memory")
+    }
+}
+
+#[derive(Debug)]
+pub enum BufferError {
+    NotMapped,
+    NotAllocated,
 }
