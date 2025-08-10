@@ -93,11 +93,14 @@ impl Engine {
         let mut renderer = Renderer::new(&window_state, proxy, app_config.vsync);
 
         user_component.lock().unwrap().initialize(&mut renderer);
-        
+
         // Initialize gui renderer
         let mut gui_system = GuiSystem::new(window.as_ref());
         gui_system.initialize(&mut renderer);
         
+        // Initialize gui component
+        gui_component.as_ref().unwrap().lock().as_mut().unwrap().initialize_gui(&mut gui_system);
+
         Engine {
             _start_time: SystemTime::now(),
             window,

@@ -1,15 +1,18 @@
 use ash::vk;
-use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, Image, ImageLayout, ImageView, Offset2D, Rect2D, RenderingAttachmentInfo};
-use egui::{Context, FullOutput, ViewportId};
+use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, ImageLayout, ImageView, Offset2D, Rect2D, RenderingAttachmentInfo};
+use egui::{Context, FullOutput, TextureId, ViewportId};
 use egui_ash_renderer::{DynamicRendering, Options};
 use egui_ash_renderer::vulkan::{create_vulkan_descriptor_set, create_vulkan_descriptor_set_layout};
 use egui_winit::State;
 use crate::app::Window;
 use crate::graphics::Renderer;
 use crate::graphics::renderer::RenderComponent;
-use crate::vulkan::{CommandBuffer, Device, DescriptorPool};
+use crate::vulkan::{CommandBuffer, Device, DescriptorPool, Image};
+use std::collections::HashMap;
+use log::{trace};
 
 pub trait GuiComponent {
+    fn initialize_gui(&mut self, gui: &mut GuiSystem);
     fn gui(&mut self, gui: &GuiSystem, context: &Context);
 }
 
@@ -20,12 +23,21 @@ pub struct GuiSystem {
     device: Option<Device>,
     renderer_descriptor_pool: Option<DescriptorPool>,
     egui_output: Option<FullOutput>,
+    texture_layout: Option<DescriptorSetLayout>,
+    user_textures: HashMap<TextureId, DescriptorSet>,
 }
 
 impl Drop for GuiSystem {
     fn drop(&mut self) {
-        if let Some(renderer) = self.egui_renderer.take() {
-            drop(renderer);
+        for (id, _) in self.user_textures.iter() {
+            self.egui_renderer.as_mut().unwrap().remove_user_texture(*id);
+            trace!("Destroyed user texture {:?}", id);
+        }
+        if let Some(device) = self.device.as_ref() {
+            unsafe {
+                device.handle().destroy_descriptor_set_layout(self.texture_layout.unwrap(), None);
+                trace!("Destroyed gui image descriptor set layout {:?}", self.texture_layout.unwrap());
+            }
         }
     }
 }
@@ -57,19 +69,34 @@ impl GuiSystem {
             egui_output: None,
             device: None,
             renderer_descriptor_pool: None,
+            texture_layout: None,
+            user_textures: HashMap::new(),
         }
     }
 
-    pub fn create_texture(&self, image_view: vk::ImageView, sampler: vk::Sampler) -> DescriptorSet {
+    pub fn create_texture(&mut self, image: &Image) -> TextureId {
         let device = self.device.as_ref().unwrap().handle();
-        let layout = create_vulkan_descriptor_set_layout(device).unwrap();
-        create_vulkan_descriptor_set(
+        let descriptor_set = create_vulkan_descriptor_set(
             device,
-            layout,
+            *self.texture_layout.as_ref().unwrap(),
             self.renderer_descriptor_pool.as_ref().unwrap().handle(),
-            image_view,
-            sampler,
-        ).unwrap()
+            image.image_view,
+            image.sampler,
+        ).unwrap();
+
+        let texture_id = self.egui_renderer.as_mut().unwrap().add_user_texture(descriptor_set);
+
+        self.user_textures.insert(texture_id, descriptor_set);
+
+        texture_id
+    }
+
+    pub fn remove_texture(&mut self, texture_id: TextureId) {
+        unsafe {
+            let set = self.user_textures.remove(&texture_id).unwrap();
+            self.device.as_ref().unwrap().handle().free_descriptor_sets(self.renderer_descriptor_pool.as_ref().unwrap().descriptor_pool, &[set]).unwrap();
+        }
+        self.egui_renderer.as_mut().unwrap().remove_user_texture(texture_id);
     }
 
     pub fn on_window_event(&mut self, window: &winit::window::Window, event: &winit::event::WindowEvent) {
@@ -116,9 +143,10 @@ impl RenderComponent for GuiSystem {
             }
         ).unwrap());
 
+        self.texture_layout = Some(create_vulkan_descriptor_set_layout(self.device.as_ref().unwrap().handle()).unwrap());
     }
 
-    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, _: &Image, swapchain_image_view: &ImageView) {
+    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, _: &vk::Image, swapchain_image_view: &ImageView) {
 
         if let Some(output) = self.egui_output.take() {
 

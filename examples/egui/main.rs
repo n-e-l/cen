@@ -210,6 +210,9 @@ impl RenderComponent for ComputeRender {
 }
 
 impl GuiComponent for ComputeRender {
+    fn initialize_gui(&mut self, _: &mut GuiSystem) {
+    }
+
     fn gui(&mut self, _: &GuiSystem, ctx: &Context) {
         egui::Window::new("Shader controls")
             .resizable(true)

@@ -5,12 +5,16 @@ use crate::vulkan::device::DeviceInner;
 use crate::vulkan::{Device, LOG_TARGET};
 
 pub struct AllocatorInner {
-    pub device_dep: Arc<DeviceInner>,
+    // IMPORTANT: Ordering matters a lot here. We want to drop the allocator before the device
     pub allocator: Arc<Mutex<gpu_allocator::vulkan::Allocator>>,
+    pub device_dep: Arc<DeviceInner>,
 }
 
 impl Drop for AllocatorInner {
     fn drop(&mut self) {
+        let allocator = self.allocator.lock().unwrap();
+        let report = allocator.generate_report();
+        println!("{:?}", report);
         trace!(target: LOG_TARGET, "Destroyed allocator");
     }
 }

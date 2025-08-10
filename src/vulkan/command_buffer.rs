@@ -180,10 +180,10 @@ impl CommandBuffer {
         }
     }
 
-    pub fn clear_color_image(&self, image: &Image) {
+    pub fn clear_color_image(&self, image: &Image, color: [f32; 4]) {
         unsafe {
             let mut clear_color_value = vk::ClearColorValue::default();
-            clear_color_value.float32 = [ 0f32, 0f32, 0f32, 0f32];
+            clear_color_value.float32 = color;
             let sub_resource_ranges = [ vk::ImageSubresourceRange::default()
                 .aspect_mask(vk::ImageAspectFlags::COLOR)
                 .base_array_layer(0)

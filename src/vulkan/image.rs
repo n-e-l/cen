@@ -3,7 +3,7 @@ use ash::vk;
 use ash::vk::{ComponentMapping, ImageAspectFlags};
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
-use log::trace;
+use log::{trace};
 use crate::vulkan::{Allocator, Device, LOG_TARGET};
 use crate::vulkan::allocator::AllocatorInner;
 use crate::vulkan::device::DeviceInner;
@@ -31,7 +31,7 @@ impl Drop for Image {
                 trace!(target: LOG_TARGET, "Destroyed image memory: [{}]", memory_addr)
             }
             self.device_dep.device.destroy_image(self.image, None);
-            trace!(target: LOG_TARGET, "Destroyed image: [{}]", image_addr)
+            trace!(target: LOG_TARGET, "Destroyed image: [{}]", image_addr);
         }
     }
 }
@@ -132,11 +132,11 @@ impl Image {
     pub fn handle(&self) -> &vk::Image {
         &self.image
     }
-    
+
     pub fn image_view(&self) -> vk::ImageView {
         self.image_view
     }
-    
+
     pub fn sampler(&self) -> vk::Sampler {
         self.sampler
     }
