@@ -180,7 +180,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn clear_color_image(&self, image: &Image, color: [f32; 4]) {
+    pub fn clear_color_image(&self, image: &Image, layout: ImageLayout, color: [f32; 4]) {
         unsafe {
             let mut clear_color_value = vk::ClearColorValue::default();
             clear_color_value.float32 = color;
@@ -194,7 +194,7 @@ impl CommandBuffer {
                 .cmd_clear_color_image(
                     self.inner.command_buffer,
                     image.image,
-                    vk::ImageLayout::GENERAL,
+                    layout,
                     &clear_color_value,
                     &sub_resource_ranges
                 )
