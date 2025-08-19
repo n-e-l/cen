@@ -2,7 +2,7 @@ use std::sync::Arc;
 use ash::khr::swapchain;
 use ash::vk;
 use ash::vk::{CompositeAlphaFlagsKHR, ImageUsageFlags, PresentModeKHR, SharingMode, SurfaceFormatKHR, SwapchainKHR};
-use log::info;
+use log::{debug, info};
 use crate::graphics::renderer::WindowState;
 use crate::vulkan::{Device, Instance, Surface, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
@@ -86,6 +86,8 @@ impl Swapchain {
             .cloned()
             .find(|&mode| mode == preferred_present_mode)
             .unwrap_or(vk::PresentModeKHR::FIFO);
+        
+        debug!(target: LOG_TARGET, "Present mode: {:?}", present_mode);
 
         let extent = match surface_capabilities.current_extent.width {
             u32::MAX => window.extent2d,

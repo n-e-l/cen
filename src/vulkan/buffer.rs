@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use ash::vk;
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
-use log::{error, trace};
+use log::{trace};
 use crate::vulkan::{Allocator, Device, GpuHandle, LOG_TARGET};
 use crate::vulkan::allocator::AllocatorInner;
 use crate::vulkan::device::DeviceInner;
@@ -110,6 +110,10 @@ impl Buffer {
     pub fn handle(&self) -> &vk::Buffer {
         &self.inner.buffer
     }
+
+    pub fn size(&self) -> vk::DeviceSize {
+        self.inner.size
+    }
 }
 
 pub struct MappedBufferGuard<'a> {
@@ -119,6 +123,10 @@ pub struct MappedBufferGuard<'a> {
 impl<'a> MappedBufferGuard<'a> {
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         self._guard.as_mut().unwrap().mapped_slice_mut().expect("Failed to map memory")
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        self._guard.as_ref().unwrap().mapped_slice().expect("Failed to map memory")
     }
 }
 

@@ -4,7 +4,7 @@ use ash::vk::{ComponentMapping, ImageAspectFlags};
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
 use log::{trace};
-use crate::vulkan::{Allocator, Device, GpuHandle, LOG_TARGET};
+use crate::vulkan::{Allocator, Device, LOG_TARGET};
 use crate::vulkan::allocator::AllocatorInner;
 use crate::vulkan::device::DeviceInner;
 

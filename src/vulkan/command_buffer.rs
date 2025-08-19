@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::{BufferImageCopy, DeviceSize, ImageLayout, WriteDescriptorSet};
+use ash::vk::{BufferImageCopy, DeviceSize, FenceCreateFlags, ImageCopy, ImageLayout, WriteDescriptorSet};
 use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, GpuHandle, Image, Pipeline, RenderPass};
 use crate::vulkan::device::DeviceInner;
 
 pub struct CommandBufferInner {
     device_dep: Arc<DeviceInner>,
     command_buffer: vk::CommandBuffer,
+    in_flight_fence: vk::Fence,
     resource_handles: Mutex<Vec<Arc<dyn GpuHandle>>>,
 }
 
@@ -14,8 +15,16 @@ pub struct CommandBuffer {
     inner: Arc<CommandBufferInner>,
 }
 
+impl Drop for CommandBufferInner {
+    fn drop(&mut self) {
+        unsafe {
+            self.device_dep.device.destroy_fence(self.in_flight_fence, None);
+        }
+    }
+}
+
 impl CommandBuffer {
-    pub fn new(device: &Device, command_pool: &CommandPool) -> CommandBuffer {
+    pub fn new(device: &Device, command_pool: &CommandPool, signaled: bool) -> CommandBuffer {
         let command_buffer_allocate_info = vk::CommandBufferAllocateInfo::default()
             .command_pool(command_pool.handle())
             .level(vk::CommandBufferLevel::PRIMARY)
@@ -28,10 +37,23 @@ impl CommandBuffer {
                 .expect("Failed to allocate command buffers")
         };
 
+        let fence = unsafe {
+            let fence_create_info = if signaled {
+                vk::FenceCreateInfo::default()
+                    .flags(FenceCreateFlags::SIGNALED)
+            } else {
+                vk::FenceCreateInfo::default()
+            };
+
+            device.handle().create_fence(&fence_create_info, None)
+                .expect("Failed to create fence")
+        };
+
         CommandBuffer {
             inner: Arc::new(CommandBufferInner {
                 device_dep: device.inner.clone(),
                 command_buffer,
+                in_flight_fence: fence,
                 resource_handles: Mutex::new(Vec::new()),
             }),
         }
@@ -264,6 +286,20 @@ impl CommandBuffer {
         lock.push(buffer.reference());
     }
     
+    pub fn copy_image(&self, from: &Image, from_layout: ImageLayout, to: &Image, to_layout: ImageLayout, regions: &[ImageCopy]) {
+        unsafe {
+            self.inner.device_dep.device
+                .cmd_copy_image(
+                    self.inner.command_buffer,
+                    *from.handle(),
+                    from_layout,
+                    *to.handle(),
+                    to_layout,
+                    regions
+                );
+        }
+    }
+    
     pub fn buffer_barrier(
         &self,
         src_stage_mask: vk::PipelineStageFlags,
@@ -350,6 +386,10 @@ impl CommandBuffer {
 
     pub fn handle(&self) -> vk::CommandBuffer {
         self.inner.command_buffer
+    }
+
+    pub fn fence(&self) -> vk::Fence {
+        self.inner.in_flight_fence
     }
 
     pub fn clone(&self) -> CommandBuffer {

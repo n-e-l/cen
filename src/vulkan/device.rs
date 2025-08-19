@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use ash::khr::swapchain;
 use ash::vk;
-use ash::vk::{Fence, PipelineStageFlags, Queue};
+use ash::vk::{PipelineStageFlags, Queue};
 use log::trace;
 use crate::vulkan::{CommandBuffer, Instance, LOG_TARGET};
 use crate::vulkan::instance::InstanceInner;
@@ -131,21 +131,14 @@ impl Device {
         &self,
         queue: Queue,
         command_buffer: &CommandBuffer
-    ) -> Fence {
+    ) {
         unsafe {
             let command_buffers = [command_buffer.handle()];
             let submit_info = vk::SubmitInfo::default()
                 .command_buffers(&command_buffers);
 
-            let fence_create_info = vk::FenceCreateInfo::default();
-            let fence = self.handle()
-                    .create_fence(&fence_create_info, None)
-                    .expect("Failed to create fence");
-
             let submits = [submit_info];
-            self.handle().queue_submit(queue, &submits, fence).unwrap();
-            
-            fence
+            self.handle().queue_submit(queue, &submits, command_buffer.fence()).unwrap();
         }
     }
 
@@ -159,7 +152,6 @@ impl Device {
     pub fn submit_command_buffer(
         &self,
         queue: &Queue,
-        fence: vk::Fence,
         wait_semaphore: vk::Semaphore,
         signal_semaphore: vk::Semaphore,
         command_buffer: &CommandBuffer
@@ -176,6 +168,7 @@ impl Device {
             .wait_dst_stage_mask(&wait_dst_stage_masks);
 
         let submits = [submit_info];
+        let fence = command_buffer.fence();
         unsafe { self.handle().queue_submit(*queue, &submits, fence).unwrap(); }
     }
 

@@ -37,6 +37,18 @@ impl Engine {
         match event {
             WindowEvent::RedrawRequested => {
                 self.draw();
+
+                if self.log_fps {
+                    let current_frame_time = SystemTime::now();
+                    let elapsed = current_frame_time.duration_since(self.last_print_time).unwrap();
+                    self.frame_count += 1;
+
+                    if elapsed.as_secs() >= 1 {
+                        info!("fps: {}, frametime: {:.3}ms", self.frame_count, elapsed.as_millis() as f32 / self.frame_count as f32);
+                        self.frame_count = 0;
+                        self.last_print_time = current_frame_time;
+                    }
+                }
             },
             WindowEvent::Resized( _ ) => {
             }
@@ -61,19 +73,7 @@ impl Engine {
         match cause {
             | StartCause::Poll => {
                 self.update();
-                self.draw();
-
-                if self.log_fps {
-                    let current_frame_time = SystemTime::now();
-                    let elapsed = current_frame_time.duration_since(self.last_print_time).unwrap();
-                    self.frame_count += 1;
-
-                    if elapsed.as_secs() >= 1 {
-                        info!("fps: {}, frametime: {:.3}ms", self.frame_count, elapsed.as_millis() as f32 / self.frame_count as f32);
-                        self.frame_count = 0;
-                        self.last_print_time = current_frame_time;
-                    }
-                }
+                self.window.winit_window().request_redraw();
             }
             _ => {}
         }
