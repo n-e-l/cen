@@ -1,5 +1,6 @@
 # Project files
 .idea/
+.direnv/
 
 # will have compiled files and executables
 debug/
