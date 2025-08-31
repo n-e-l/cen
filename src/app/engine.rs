@@ -50,7 +50,23 @@ impl Engine {
                     }
                 }
             },
-            WindowEvent::Resized( _ ) => {
+            WindowEvent::Resized( .. ) => {
+                let window_state = WindowState {
+                    window_handle: self.window.window_handle(),
+                    display_handle: self.window.display_handle(),
+                    extent2d: self.window.get_extent(),
+                    scale_factor: self.window.scale_factor(),
+                };
+                self.renderer.recreate_window(window_state);
+            },
+            WindowEvent::ScaleFactorChanged {  .. } => {
+                let window_state = WindowState {
+                    window_handle: self.window.window_handle(),
+                    display_handle: self.window.display_handle(),
+                    extent2d: self.window.get_extent(),
+                    scale_factor: self.window.scale_factor(),
+                };
+                self.renderer.recreate_window(window_state);
             }
             _ => (),
         }
@@ -88,6 +104,7 @@ impl Engine {
             window_handle: window.window_handle(),
             display_handle: window.display_handle(),
             extent2d: window.get_extent(),
+            scale_factor: window.scale_factor(),
         };
 
         let mut renderer = Renderer::new(&window_state, proxy, app_config.vsync);

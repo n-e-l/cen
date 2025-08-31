@@ -1,3 +1,4 @@
+use log::info;
 use std::time::Instant;
 use ash::vk;
 use ash::vk::{Extent2D, ImageAspectFlags, PhysicalDevice, Queue};
@@ -29,13 +30,15 @@ pub struct Renderer {
     pub physical_device: PhysicalDevice,
     pub instance: Instance,
     pub start_time: Instant,
+    present_mode: vk::PresentModeKHR,
     cb_callbacks: Vec<(CommandBuffer, Box<dyn FnOnce()>)>
 }
 
 pub struct WindowState<'a> {
     pub window_handle: WindowHandle<'a>,
     pub display_handle: DisplayHandle<'a>,
-    pub extent2d: Extent2D
+    pub extent2d: Extent2D,
+    pub scale_factor: f64,
 }
 
 impl Renderer {
@@ -66,7 +69,8 @@ impl Renderer {
             vk::PresentModeKHR::IMMEDIATE
         };
 
-        let swapchain = Swapchain::new(&instance, &physical_device, &device, &window, &surface, present_mode);
+        info!("Creating initial swapchain");
+        let swapchain = Swapchain::new(&instance, &physical_device, &device, &window, &surface, present_mode, None);
         Self::transition_swapchain_images(&device, &command_pool, &queue, &swapchain);
 
         let command_buffers = (0..swapchain.get_image_count()).map(|_| {
@@ -105,8 +109,16 @@ impl Renderer {
             pipeline_store,
             frame_index: 0,
             start_time,
+            present_mode,
             cb_callbacks: Default::default()
         }
+    }
+
+    pub(crate) fn recreate_window(&mut self, window_state: WindowState) {
+        info!("Recreating swapchain");
+        self.device.wait_idle();
+        self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
+        Self::transition_swapchain_images(&self.device, &self.command_pool, &self.queue, &self.swapchain);
     }
 
     fn transition_swapchain_images(device: &Device, command_pool: &CommandPool, queue: &Queue, swapchain: &Swapchain) {

@@ -41,7 +41,8 @@ impl Swapchain {
         device: &Device,
         window: &WindowState,
         surface: &Surface,
-        preferred_present_mode: PresentModeKHR
+        preferred_present_mode: PresentModeKHR,
+        old_swapchain: Option<SwapchainKHR>
     ) -> Swapchain {
         let swapchain_loader = swapchain::Device::new(instance.handle(), device.handle());
 
@@ -93,8 +94,10 @@ impl Swapchain {
             u32::MAX => window.extent2d,
             _ => surface_capabilities.current_extent
         };
+        info!(target: LOG_TARGET, "Using swapchain extent: {:?}", extent);
+        info!(target: LOG_TARGET, "Using scale factor: {:?}", window.scale_factor);
 
-        let create_info = vk::SwapchainCreateInfoKHR::default()
+        let mut create_info = vk::SwapchainCreateInfoKHR::default()
             .image_usage(ImageUsageFlags::COLOR_ATTACHMENT | ImageUsageFlags::TRANSFER_DST)
             .image_extent(extent)
             .image_sharing_mode(SharingMode::EXCLUSIVE)
@@ -107,6 +110,10 @@ impl Swapchain {
             .surface(*surface.handle())
             .clipped(true)
             .image_array_layers(1);
+
+        if let Some(old_swapchain) = old_swapchain {
+            create_info = create_info.old_swapchain(old_swapchain);
+        }
 
         let swapchain = unsafe { swapchain_loader.create_swapchain(&create_info, None).unwrap() };
 

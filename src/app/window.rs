@@ -37,11 +37,11 @@ impl Window {
         &self.window
     }
 
-    pub fn window_handle(&self) -> WindowHandle {
+    pub fn window_handle(&self) -> WindowHandle<'_> {
         self.window.window_handle().unwrap()
     }
 
-    pub fn display_handle(&self) -> DisplayHandle {
+    pub fn display_handle(&self) -> DisplayHandle<'_> {
         self.window.display_handle().unwrap()
     }
 
@@ -49,6 +49,10 @@ impl Window {
         let width = self.window.inner_size().width;
         let height = self.window.inner_size().height;
         Extent2D{ width, height }
+    }
+
+    pub fn scale_factor(&self) -> f64 {
+        self.window.scale_factor()
     }
 
     pub fn window_event(&mut self, event: WindowEvent, event_loop: &ActiveEventLoop) {

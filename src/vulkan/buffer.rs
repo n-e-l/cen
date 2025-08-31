@@ -83,7 +83,7 @@ impl Buffer {
         }
     }
 
-    pub fn mapped(&self) -> Result<MappedBufferGuard, BufferError> {
+    pub fn mapped(&self) -> Result<MappedBufferGuard<'_>, BufferError> {
 
         let allocation_guard = self.inner.allocation.lock().unwrap();
 
