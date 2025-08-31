@@ -97,7 +97,7 @@ impl Engine {
     
     pub fn new(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig, user_component: Arc<Mutex<dyn RenderComponent>>, gui_component: Option<Arc<Mutex<dyn GuiComponent>>>) -> Engine {
         // Create the graphics context
-        let window = Box::new(Window::create(&event_loop, "cen", app_config.width, app_config.height, app_config.fullscreen));
+        let window = Box::new(Window::create(&event_loop, "cen", app_config.width, app_config.height, app_config.fullscreen, app_config.resizable));
 
         // Setup renderer
         let window_state = WindowState {

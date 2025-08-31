@@ -16,10 +16,10 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn create(event_loop: &ActiveEventLoop, window_title: &str, width: u32, height: u32, fullscreen: bool) -> Window {
+    pub fn create(event_loop: &ActiveEventLoop, window_title: &str, width: u32, height: u32, fullscreen: bool, resizable: bool) -> Window {
         let mut attributes = WindowAttributes::default()
             .with_title(window_title)
-            .with_resizable(false)
+            .with_resizable(resizable)
             .with_inner_size(winit::dpi::LogicalSize::new(width, height));
 
         if fullscreen {

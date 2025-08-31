@@ -25,6 +25,7 @@ pub struct AppConfig {
     pub(crate) vsync: bool,
     pub(crate) log_fps: bool,
     pub(crate) fullscreen: bool,
+    pub(crate) resizable: bool,
 }
 
 impl AppConfig {
@@ -35,7 +36,8 @@ impl AppConfig {
             height: 1000,
             vsync: true,
             log_fps: false,
-            fullscreen: false
+            fullscreen: false,
+            resizable: false,
         }
     }
 
@@ -61,6 +63,11 @@ impl AppConfig {
 
     pub fn fullscreen(mut self, fullscreen: bool) -> Self {
         self.fullscreen = fullscreen;
+        self
+    }
+
+    pub fn resizable(mut self, resizable: bool) -> Self {
+        self.resizable = resizable;
         self
     }
 
