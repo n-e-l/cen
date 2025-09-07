@@ -2,7 +2,7 @@ use std::sync::Arc;
 use ash::khr::swapchain;
 use ash::vk;
 use ash::vk::{CompositeAlphaFlagsKHR, ImageUsageFlags, PresentModeKHR, SharingMode, SurfaceFormatKHR, SwapchainKHR};
-use log::{debug, info};
+use log::{debug, info, trace};
 use crate::graphics::renderer::WindowState;
 use crate::vulkan::{Device, Instance, Surface, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
@@ -96,6 +96,7 @@ impl Swapchain {
         };
         info!(target: LOG_TARGET, "Using swapchain extent: {:?}", extent);
         info!(target: LOG_TARGET, "Using scale factor: {:?}", window.scale_factor);
+        info!(target: LOG_TARGET, "Using image count: {:?}", desired_image_count);
 
         let mut create_info = vk::SwapchainCreateInfoKHR::default()
             .image_usage(ImageUsageFlags::COLOR_ATTACHMENT | ImageUsageFlags::TRANSFER_DST)

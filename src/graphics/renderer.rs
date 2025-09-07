@@ -1,4 +1,4 @@
-use log::info;
+use log::{info, trace};
 use std::time::Instant;
 use ash::vk;
 use ash::vk::{Extent2D, ImageAspectFlags, PhysicalDevice, Queue};
@@ -242,6 +242,7 @@ impl Renderer {
         let fence = self.command_buffers[self.frame_index].fence();
         self.device.wait_for_fence(fence);
 
+        // Acquire image and signal the semaphore
         let image_index = self.swapchain.acquire_next_image(self.image_available_semaphores[self.frame_index]) as usize;
 
         self.record_command_buffer(self.frame_index, image_index, render_component);
@@ -253,13 +254,13 @@ impl Renderer {
         self.device.submit_command_buffer(
             &self.queue,
             self.image_available_semaphores[self.frame_index],
-            self.render_finished_semaphores[self.frame_index],
+            self.render_finished_semaphores[image_index],
             &self.command_buffers[self.frame_index]
         );
 
         self.swapchain.queue_present(
             self.queue,
-            self.render_finished_semaphores[self.frame_index],
+            self.render_finished_semaphores[image_index],
             image_index as u32
         );
 
