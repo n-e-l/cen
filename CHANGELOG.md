@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.7](https://github.com/n-e-l/cen/compare/v0.0.6...v0.0.7) - 2025-09-07
+
+### Other
+
+- Fix warnings
+- Update CHANGELOG.md
+- Render gui on first frame
+- Link swapchain images with specific semaphores
+- Allow resizing
+- Update gitignore
+- Add swapchain recreation
+- Fix tests
+- Add better command buffer management
+- Add lifetime watching to Buffers
+- Update to egui 0.32.0
+- Add layout to clear color
+- Add gui calls and fix allocator destruction
+- Provide sampler and imageview
+- Create a descriptor pool without ash renderer bindings
+- Add descriptor pool handle and clean up loose destructor
+
 - Add command buffer lifetime management for buffers and images
 - Fix swapchain semaphores indexing issue
 - Render gui on first frame
