@@ -118,6 +118,12 @@ impl Engine {
         // Initialize gui component
         if let Some(gui) = gui_component.as_ref() {
             gui.lock().as_mut().unwrap().initialize_gui(&mut gui_system);
+
+            // Create the first gui frame
+            gui_system.update(
+                window.winit_window(),
+                &mut [gui.lock().unwrap().deref_mut()]
+            );
         }
 
         Engine {
