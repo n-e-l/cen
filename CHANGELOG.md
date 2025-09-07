@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add command buffer lifetime management for buffers and images
+- Fix swapchain semaphores indexing issue
+- Render gui on first frame
+- Enable resizing
+- Update to egui 0.32.0
+
 ## [0.0.6](https://github.com/n-e-l/cen/compare/v0.0.5...v0.0.6) - 2025-08-08
 
 ### Other
