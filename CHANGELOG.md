@@ -11,23 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Other
 
-- Fix warnings
-- Update CHANGELOG.md
-- Render gui on first frame
-- Link swapchain images with specific semaphores
-- Allow resizing
-- Update gitignore
-- Add swapchain recreation
-- Fix tests
-- Add better command buffer management
-- Add lifetime watching to Buffers
-- Update to egui 0.32.0
-- Add layout to clear color
-- Add gui calls and fix allocator destruction
-- Provide sampler and imageview
-- Create a descriptor pool without ash renderer bindings
-- Add descriptor pool handle and clean up loose destructor
-
 - Add command buffer lifetime management for buffers and images
 - Fix swapchain semaphores indexing issue
 - Render gui on first frame
@@ -41,24 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update release.yml
 - Update release.yml
 - Support image loading
-- Update idk
-# Changelog
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
 
 ## [0.0.5](https://github.com/angelocarly/cen/compare/v0.0.4...v0.0.5) - 2025-03-10
 
 ### Other
 
-- Update rust.yml
-- Update rust.yml
-- Update rust.yml
-- Update rust.yml
-- Update rust.yml
 - Remove indices in reverse
 - Support single time command buffer finish callbacks
 - Add copy image to buffer command
