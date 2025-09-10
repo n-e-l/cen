@@ -9,7 +9,7 @@ use crate::graphics::Renderer;
 use crate::graphics::renderer::RenderComponent;
 use crate::vulkan::{CommandBuffer, Device, DescriptorPool, Image};
 use std::collections::HashMap;
-use log::{trace};
+use log::{error, trace};
 
 pub trait GuiComponent {
     fn initialize_gui(&mut self, gui: &mut GuiSystem);
@@ -181,12 +181,17 @@ impl RenderComponent for GuiSystem {
             command_buffer.begin_rendering(&rendering_info);
 
             // Egui draw call
-            self.egui_renderer.as_mut().unwrap().cmd_draw(
+            match self.egui_renderer.as_mut().unwrap().cmd_draw(
                 command_buffer.handle(),
                 renderer.swapchain.get_extent(),
                 output.pixels_per_point,
                 clipped_primitives.as_slice()
-            ).unwrap();
+            ) {
+                Ok(_) => (),
+                Err(e) => {
+                    error!("{}", e);
+                }
+            }
 
             command_buffer.end_rendering();
         }

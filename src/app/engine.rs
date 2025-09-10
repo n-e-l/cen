@@ -134,16 +134,21 @@ impl Engine {
     }
     
     pub fn update(&mut self) {
+    }
+    
+    pub fn draw(&mut self) {
+        
+        // Update our gui. Has to happen each frame or we will miss frames
         if let Some(gui) = &self.gui {
             self.gui_system.update(
                 self.window.winit_window(),
                 &mut [gui.lock().unwrap().deref_mut()]
             );
         }
-    }
-    
-    pub fn draw(&mut self) {
+        
         self.renderer.update();
+        
+        // Render all our components
         self.renderer.draw_frame(&mut [
             self.component.lock().unwrap().deref_mut(),
             &mut self.gui_system
