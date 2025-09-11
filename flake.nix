@@ -25,7 +25,6 @@
             rust-analyzer
             cargo-watch
             cargo-edit
-            gcc
 
 	    # GPU
 	    vulkan-loader

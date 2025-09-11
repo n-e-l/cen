@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::{BufferImageCopy, DeviceSize, FenceCreateFlags, ImageCopy, ImageLayout, WriteDescriptorSet};
+use ash::vk::{BufferImageCopy, DeviceSize, FenceCreateFlags, ImageAspectFlags, ImageCopy, ImageLayout, WriteDescriptorSet};
 use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, GpuHandle, Image, Pipeline, RenderPass};
 use crate::vulkan::device::DeviceInner;
+use std::borrow::Borrow;
 
 pub struct CommandBufferInner {
     device_dep: Arc<DeviceInner>,
@@ -112,6 +113,47 @@ impl CommandBuffer {
         }
     }
 
+    pub fn transition_image<T>(
+        &self,
+        image: T,
+        old_layout: vk::ImageLayout,
+        new_layout: vk::ImageLayout,
+        src_stage_mask: vk::PipelineStageFlags,
+        dst_stage_mask: vk::PipelineStageFlags,
+        src_access_flags: vk::AccessFlags,
+        dst_access_flags: vk::AccessFlags,
+    )
+    where
+        T: Borrow<vk::Image>
+    {
+        let image_memory_barrier = vk::ImageMemoryBarrier::default()
+            .old_layout(old_layout)
+            .new_layout(new_layout)
+            .src_access_mask(src_access_flags)
+            .dst_access_mask(dst_access_flags)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .image(*image.borrow())
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+        unsafe {
+            self.inner.device_dep.device.cmd_pipeline_barrier(
+                self.inner.command_buffer,
+                src_stage_mask,
+                dst_stage_mask,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[image_memory_barrier]
+            )
+        }
+    }
+
     pub fn bind_push_descriptor_images(&self, pipeline: &dyn Pipeline, images: &Vec<&Image>) {
         let bindings = images.iter().map(|image| {
             vk::DescriptorImageInfo::default()
@@ -202,7 +244,10 @@ impl CommandBuffer {
         }
     }
 
-    pub fn clear_color_image(&self, image: &Image, layout: ImageLayout, color: [f32; 4]) {
+    pub fn clear_color_image<T>(&self, image: T, layout: ImageLayout, color: [f32; 4])
+    where
+        T: Borrow<vk::Image>
+    {
         unsafe {
             let mut clear_color_value = vk::ClearColorValue::default();
             clear_color_value.float32 = color;
@@ -215,7 +260,7 @@ impl CommandBuffer {
             self.inner.device_dep.device
                 .cmd_clear_color_image(
                     self.inner.command_buffer,
-                    image.image,
+                    *image.borrow(),
                     layout,
                     &clear_color_value,
                     &sub_resource_ranges

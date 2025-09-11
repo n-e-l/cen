@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::borrow::Borrow;
 use ash::vk;
 use ash::vk::{ComponentMapping, ImageAspectFlags};
 use gpu_allocator::MemoryLocation;
@@ -34,6 +35,12 @@ impl Drop for Image {
             self.device_dep.device.destroy_image(self.image, None);
             trace!(target: LOG_TARGET, "Destroyed image: [{}]", image_addr);
         }
+    }
+}
+
+impl Borrow<vk::Image> for &Image {
+    fn borrow(&self) -> &vk::Image {
+        &self.image
     }
 }
 

@@ -34,7 +34,7 @@ impl RenderComponent for ComputeRender {
         let mut image_command_buffer = CommandBuffer::new(&renderer.device, &renderer.command_pool, false);
         image_command_buffer.begin();
         {
-            renderer.transition_image(&image_command_buffer, image.handle(), vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty(), vk::AccessFlags::empty());
+            image_command_buffer.transition_image(&image, vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty(), vk::AccessFlags::empty());
         }
         image_command_buffer.end();
         renderer.submit_single_time_command_buffer(image_command_buffer);
@@ -105,9 +105,8 @@ impl RenderComponent for ComputeRender {
         command_buffer.dispatch(500, 500, 1 );
 
         // Transition the render to a source
-        renderer.transition_image(
-            &command_buffer,
-            &self.image.as_ref().unwrap().handle(),
+        command_buffer.transition_image(
+            self.image.as_ref().unwrap(),
             vk::ImageLayout::GENERAL,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::PipelineStageFlags::COMPUTE_SHADER,
@@ -117,9 +116,8 @@ impl RenderComponent for ComputeRender {
         );
 
         // Transition the swapchain image
-        renderer.transition_image(
-            &command_buffer,
-            &swapchain_image,
+        command_buffer.transition_image(
+            swapchain_image,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::PipelineStageFlags::TOP_OF_PIPE,
@@ -129,23 +127,12 @@ impl RenderComponent for ComputeRender {
         );
 
         // Copy to the swapchain
+        command_buffer.clear_color_image(
+            swapchain_image,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            [0.0, 0.0, 0.0, 1.0]
+        );
         unsafe {
-
-            renderer.device.handle().cmd_clear_color_image(
-                command_buffer.handle(),
-                *swapchain_image,
-                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                &vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 1.0]
-                },
-                &[vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                }]
-            );
 
             // Use a blit, as a copy doesn't synchronize properly to the swapchain on MoltenVK
             renderer.device.handle().cmd_blit_image(
@@ -183,9 +170,8 @@ impl RenderComponent for ComputeRender {
         }
 
         // Transfer back to default states
-        renderer.transition_image(
-            &command_buffer,
-            &swapchain_image,
+        command_buffer.transition_image(
+            swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::PipelineStageFlags::TRANSFER,
@@ -195,9 +181,8 @@ impl RenderComponent for ComputeRender {
         );
 
         // Transition the render image back
-        renderer.transition_image(
-            &command_buffer,
-            &self.image.as_ref().unwrap().handle(),
+        command_buffer.transition_image(
+            self.image.as_ref().unwrap(),
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::ImageLayout::GENERAL,
             vk::PipelineStageFlags::TRANSFER,

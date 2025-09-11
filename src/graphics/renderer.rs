@@ -1,7 +1,7 @@
 use log::{info};
 use std::time::Instant;
 use ash::vk;
-use ash::vk::{Extent2D, ImageAspectFlags, PhysicalDevice, Queue};
+use ash::vk::{Extent2D, ImageLayout, PhysicalDevice, Queue};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
 use winit::raw_window_handle::{DisplayHandle, WindowHandle};
@@ -168,51 +168,33 @@ impl Renderer {
 
         let swapchain_image = self.swapchain.get_images()[image_index];
         let swapchain_image_view = self.swapchain.get_image_views()[image_index];
-        
+
+        // Clear the swapchain image
+        command_buffer.transition_image(
+            &swapchain_image,
+            ImageLayout::PRESENT_SRC_KHR,
+            ImageLayout::TRANSFER_DST_OPTIMAL,
+            vk::PipelineStageFlags::TOP_OF_PIPE,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::AccessFlags::empty(),
+            vk::AccessFlags::MEMORY_WRITE,
+        );
+        command_buffer.clear_color_image(&swapchain_image, ImageLayout::TRANSFER_DST_OPTIMAL, [0.0, 0.0, 0.0, 1.0]);
+        command_buffer.transition_image(
+            &swapchain_image,
+            ImageLayout::TRANSFER_DST_OPTIMAL,
+            ImageLayout::PRESENT_SRC_KHR,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+            vk::AccessFlags::MEMORY_WRITE,
+            vk::AccessFlags::empty(),
+        );
+
         for rc in render_components.iter_mut() {
             rc.render( self, &mut command_buffer, &swapchain_image, &swapchain_image_view );
         }
 
         command_buffer.end();
-    }
-
-    pub fn transition_image(
-        &self,
-        command_buffer: &CommandBuffer,
-        image: &vk::Image,
-        old_layout: vk::ImageLayout,
-        new_layout: vk::ImageLayout,
-        src_stage_mask: vk::PipelineStageFlags,
-        dst_stage_mask: vk::PipelineStageFlags,
-        src_access_flags: vk::AccessFlags,
-        dst_access_flags: vk::AccessFlags,
-    ) {
-        let image_memory_barrier = vk::ImageMemoryBarrier::default()
-            .old_layout(old_layout)
-            .new_layout(new_layout)
-            .src_access_mask(src_access_flags)
-            .dst_access_mask(dst_access_flags)
-            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .image(*image)
-            .subresource_range(vk::ImageSubresourceRange {
-                aspect_mask: ImageAspectFlags::COLOR,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            });
-        unsafe {
-            self.device.handle().cmd_pipeline_barrier(
-                command_buffer.handle(),
-                src_stage_mask,
-                dst_stage_mask,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &[image_memory_barrier]
-            )
-        }
     }
 
     fn update_callbacks(&mut self) {

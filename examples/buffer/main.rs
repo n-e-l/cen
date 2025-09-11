@@ -15,7 +15,7 @@ struct ComputeRender {
 impl RenderComponent for ComputeRender {
     fn initialize(&mut self, renderer: &mut Renderer) {
         // Image
-        let mut buffer = Buffer::new(
+        let buffer = Buffer::new(
             &renderer.device,
             &mut renderer.allocator,
             MemoryLocation::CpuToGpu,
@@ -36,9 +36,8 @@ impl RenderComponent for ComputeRender {
     fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image, _: &vk::ImageView) {
 
         // Transition the swapchain image
-        renderer.transition_image(
-            &command_buffer,
-            &swapchain_image,
+        command_buffer.transition_image(
+            swapchain_image,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::PipelineStageFlags::TOP_OF_PIPE,
@@ -93,9 +92,8 @@ impl RenderComponent for ComputeRender {
         }
 
         // Transfer back to default states
-        renderer.transition_image(
-            &command_buffer,
-            &swapchain_image,
+        command_buffer.transition_image(
+            swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::PipelineStageFlags::TRANSFER,
