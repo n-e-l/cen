@@ -151,6 +151,7 @@ impl App {
             .filter(Some("sctk"), LevelFilter::Error)
             .filter(Some("notify_debouncer_mini"), LevelFilter::Error)
             .filter(Some("egui_ash_renderer"), LevelFilter::Error)
+            .filter(Some("egui_winit"), LevelFilter::Error)
             .init();
     }
     
