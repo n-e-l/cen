@@ -2,10 +2,10 @@
 name = "cen"
 version = "0.0.7"
 edition = "2021"
-authors = ["Angelo Carly <angelo.carly@protonmail.com"]
+authors = ["Lauda Carly <lauda@nel.re>"]
 description = "Vulkan window backend"
 readme = "README.md"
-repository = "https://github.com/angelocarly/cen"
+repository = "https://github.com/n-e-l/cen"
 license = "MIT"
 keywords = ["vulkan", "render", "engine"]
 categories = ["rendering::engine"]
