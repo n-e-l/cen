@@ -9,9 +9,19 @@ use crate::app::app::UserEvent;
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain};
 
+pub struct RenderContext<'a> {
+    pub pipeline_store: &'a PipelineStore,
+    pub command_buffer: &'a mut CommandBuffer,
+    pub swapchain_image: &'a vk::Image,
+    pub swapchain_image_view: &'a vk::ImageView,
+    pub swapchain_extent: Extent2D,
+    pub queue: &'a Queue,
+    pub command_pool: &'a CommandPool
+}
+
 pub trait RenderComponent {
     fn initialize(&mut self, renderer: &mut Renderer);
-    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image, swapchain_image_view: &vk::ImageView);
+    fn render(&mut self, ctx: &mut RenderContext);
 }
 
 pub struct Renderer {
@@ -190,8 +200,18 @@ impl Renderer {
             vk::AccessFlags::empty(),
         );
 
+        let mut ctx = RenderContext {
+            pipeline_store: &self.pipeline_store,
+            command_buffer: &mut command_buffer,
+            swapchain_image: &swapchain_image,
+            swapchain_image_view: &swapchain_image_view,
+            swapchain_extent: self.swapchain.get_extent(),
+            queue: &self.queue,
+            command_pool: &self.command_pool,
+        };
+
         for rc in render_components.iter_mut() {
-            rc.render( self, &mut command_buffer, &swapchain_image, &swapchain_image_view );
+            rc.render( &mut ctx );
         }
 
         command_buffer.end();

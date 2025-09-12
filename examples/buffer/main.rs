@@ -5,8 +5,8 @@ use gpu_allocator::MemoryLocation;
 use cen::app::App;
 use cen::app::app::AppConfig;
 use cen::graphics::Renderer;
-use cen::graphics::renderer::RenderComponent;
-use cen::vulkan::{Buffer, CommandBuffer};
+use cen::graphics::renderer::{RenderComponent, RenderContext};
+use cen::vulkan::{Buffer};
 
 struct ComputeRender {
     buffer: Option<Buffer>,
@@ -33,11 +33,11 @@ impl RenderComponent for ComputeRender {
         self.buffer = Some(buffer);
     }
 
-    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image, _: &vk::ImageView) {
+    fn render(&mut self, ctx: &mut RenderContext) {
 
         // Transition the swapchain image
-        command_buffer.transition_image(
-            swapchain_image,
+        ctx.command_buffer.transition_image(
+            ctx.swapchain_image,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::PipelineStageFlags::TOP_OF_PIPE,
@@ -47,53 +47,40 @@ impl RenderComponent for ComputeRender {
         );
 
         // Copy to the swapchain
-        unsafe {
-            renderer.device.handle().cmd_clear_color_image(
-                command_buffer.handle(),
-                *swapchain_image,
-                ImageLayout::TRANSFER_DST_OPTIMAL,
-                &vk::ClearColorValue {
-                    float32: [1.0, 0.0, 0.0, 1.0]
-                },
-                &[vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                }]
-            );
+        ctx.command_buffer.clear_color_image(
+            ctx.swapchain_image,
+            ImageLayout::TRANSFER_DST_OPTIMAL,
+            [1.0, 0.0, 0.0, 1.0]
+        );
 
-            renderer.device.handle().cmd_copy_buffer_to_image(
-                command_buffer.handle(),
-                *self.buffer.as_ref().unwrap().handle(),
-                *swapchain_image,
-                ImageLayout::TRANSFER_DST_OPTIMAL,
-                &[
-                    BufferImageCopy::default()
-                        .buffer_image_height(2000)
-                        .buffer_row_length(2000)
-                        .buffer_offset(0)
-                        .image_extent(
-                            Extent3D::default()
-                                .width(2000)
-                                .height(2000)
-                                .depth(1)
-                        )
-                        .image_subresource(
-                            ImageSubresourceLayers::default()
-                                .aspect_mask(vk::ImageAspectFlags::COLOR)
-                                .base_array_layer(0)
-                                .layer_count(1)
-                                .mip_level(0)
-                        )
-                ]
-            )
-        }
+        ctx.command_buffer.copy_buffer_to_image(
+            self.buffer.as_ref().unwrap(),
+            ctx.swapchain_image,
+            ImageLayout::TRANSFER_DST_OPTIMAL,
+            &[
+                BufferImageCopy::default()
+                    .buffer_image_height(2000)
+                    .buffer_row_length(2000)
+                    .buffer_offset(0)
+                    .image_extent(
+                        Extent3D::default()
+                            .width(2000)
+                            .height(2000)
+                            .depth(1)
+                    )
+                    .image_subresource(
+                        ImageSubresourceLayers::default()
+                            .aspect_mask(vk::ImageAspectFlags::COLOR)
+                            .base_array_layer(0)
+                            .layer_count(1)
+                            .mip_level(0)
+                    )
+            ]
+        );
 
         // Transfer back to default states
-        command_buffer.transition_image(
-            swapchain_image,
+        ctx.command_buffer.transition_image(
+            ctx.swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::PipelineStageFlags::TRANSFER,

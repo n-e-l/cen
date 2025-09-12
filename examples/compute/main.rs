@@ -5,7 +5,7 @@ use ash::vk::WriteDescriptorSet;
 use cen::app::App;
 use cen::app::app::AppConfig;
 use cen::graphics::Renderer;
-use cen::graphics::renderer::RenderComponent;
+use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{CommandBuffer, DescriptorSetLayout, Image};
 
 #[allow(dead_code)]
@@ -63,10 +63,10 @@ impl RenderComponent for ComputeRender {
         self.pipeline = Some(pipeline);
     }
 
-    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, swapchain_image: &vk::Image, _: &vk::ImageView) {
+    fn render(&mut self, ctx: &mut RenderContext) {
         // Render
-        let compute = renderer.pipeline_store().get(self.pipeline.unwrap()).unwrap();
-        command_buffer.bind_pipeline(&compute);
+        let compute = ctx.pipeline_store.get(self.pipeline.unwrap()).unwrap();
+        ctx.command_buffer.bind_pipeline(&compute);
 
         let bindings = [self.image.as_ref().unwrap().binding(vk::ImageLayout::GENERAL)];
 
@@ -76,15 +76,15 @@ impl RenderComponent for ComputeRender {
             .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
             .image_info(&bindings);
 
-        command_buffer.bind_push_descriptor(
+        ctx.command_buffer.bind_push_descriptor(
             &compute,
             0,
             &[write_descriptor_set]
         );
-        command_buffer.dispatch(500, 500, 1 );
+        ctx.command_buffer.dispatch(500, 500, 1 );
 
         // Transition the render to a source
-        command_buffer.transition_image(
+        ctx.command_buffer.transition_image(
             self.image.as_ref().unwrap(),
             vk::ImageLayout::GENERAL,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
@@ -95,8 +95,8 @@ impl RenderComponent for ComputeRender {
         );
 
         // Transition the swapchain image
-        command_buffer.transition_image(
-            swapchain_image,
+        ctx.command_buffer.transition_image(
+            ctx.swapchain_image,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::PipelineStageFlags::TOP_OF_PIPE,
@@ -106,62 +106,48 @@ impl RenderComponent for ComputeRender {
         );
 
         // Copy to the swapchain
-        unsafe {
+        ctx.command_buffer.clear_color_image(
+            ctx.swapchain_image,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            [0.0, 0.0, 0.0, 1.0]
+        );
 
-            renderer.device.handle().cmd_clear_color_image(
-                command_buffer.handle(),
-                *swapchain_image,
-                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                &vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 1.0]
-                },
-                &[vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                }]
-            );
-
-            // Use a blit, as a copy doesn't synchronize properly to the swapchain on MoltenVK
-            renderer.device.handle().cmd_blit_image(
-                command_buffer.handle(),
-                *self.image.as_ref().unwrap().handle(),
-                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                *swapchain_image,
-                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                &[vk::ImageBlit::default()
-                    .src_offsets([
-                        vk::Offset3D::default(),
-                        vk::Offset3D::default().x(self.image.as_ref().unwrap().width as i32).y(self.image.as_ref().unwrap().height as i32).z(1)
-                    ])
-                    .dst_offsets([
-                        vk::Offset3D::default(),
-                        vk::Offset3D::default().x(self.image.as_ref().unwrap().width as i32).y(self.image.as_ref().unwrap().height as i32).z(1)
-                    ])
-                    .src_subresource(
-                        vk::ImageSubresourceLayers::default()
-                            .aspect_mask(vk::ImageAspectFlags::COLOR)
-                            .base_array_layer(0)
-                            .layer_count(1)
-                            .mip_level(0)
-                    )
-                    .dst_subresource(
-                        vk::ImageSubresourceLayers::default()
-                            .aspect_mask(vk::ImageAspectFlags::COLOR)
-                            .base_array_layer(0)
-                            .layer_count(1)
-                            .mip_level(0)
-                    )
-                ],
-                vk::Filter::NEAREST,
-            );
-        }
+        // Use a blit, as a copy doesn't synchronize properly to the swapchain on MoltenVK
+        ctx.command_buffer.blit_image(
+            *self.image.as_ref().unwrap().handle(),
+            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+            *ctx.swapchain_image,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            &[vk::ImageBlit::default()
+                .src_offsets([
+                    vk::Offset3D::default(),
+                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width as i32).y(self.image.as_ref().unwrap().height as i32).z(1)
+                ])
+                .dst_offsets([
+                    vk::Offset3D::default(),
+                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width as i32).y(self.image.as_ref().unwrap().height as i32).z(1)
+                ])
+                .src_subresource(
+                    vk::ImageSubresourceLayers::default()
+                        .aspect_mask(vk::ImageAspectFlags::COLOR)
+                        .base_array_layer(0)
+                        .layer_count(1)
+                        .mip_level(0)
+                )
+                .dst_subresource(
+                    vk::ImageSubresourceLayers::default()
+                        .aspect_mask(vk::ImageAspectFlags::COLOR)
+                        .base_array_layer(0)
+                        .layer_count(1)
+                        .mip_level(0)
+                )
+            ],
+            vk::Filter::NEAREST,
+        );
 
         // Transfer back to default states
-        command_buffer.transition_image(
-            swapchain_image,
+        ctx.command_buffer.transition_image(
+            ctx.swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::PipelineStageFlags::TRANSFER,
@@ -171,7 +157,7 @@ impl RenderComponent for ComputeRender {
         );
 
         // Transition the render image back
-        command_buffer.transition_image(
+        ctx.command_buffer.transition_image(
             self.image.as_ref().unwrap(),
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::ImageLayout::GENERAL,

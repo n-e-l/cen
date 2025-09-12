@@ -268,6 +268,23 @@ impl CommandBuffer {
         }
     }
 
+    pub fn blit_image<T>(&self, src_image: T, src_layout: ImageLayout, dst_image: T, dst_layout: ImageLayout, regions: &[vk::ImageBlit], filter: vk::Filter)
+    where
+        T: Borrow<vk::Image>
+    {
+        unsafe {
+            self.inner.device_dep.device.cmd_blit_image(
+                self.inner.command_buffer,
+                *src_image.borrow(),
+                src_layout,
+                *dst_image.borrow(),
+                dst_layout,
+                regions,
+                filter,
+            );
+        }
+    }
+
     pub fn bind_pipeline(&mut self, pipeline: &dyn Pipeline) {
         unsafe {
             self.inner.device_dep.device
@@ -299,13 +316,16 @@ impl CommandBuffer {
         lock.push(buffer.reference());
     }
 
-    pub fn copy_buffer_to_image(&self, buffer: &Buffer, image: &Image, layout: ImageLayout, regions: &[BufferImageCopy]) {
+    pub fn copy_buffer_to_image<T>(&self, buffer: &Buffer, image: T, layout: ImageLayout, regions: &[BufferImageCopy])
+    where
+        T: Borrow<vk::Image>
+    {
         unsafe {
             self.inner.device_dep.device
                 .cmd_copy_buffer_to_image(
                     self.inner.command_buffer,
                     *buffer.handle(),
-                    *image.handle(),
+                    *image.borrow(),
                     layout,
                     regions
                 );

@@ -1,13 +1,13 @@
 use ash::vk;
-use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, ImageLayout, ImageView, Offset2D, Rect2D, RenderingAttachmentInfo};
+use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, ImageLayout, Offset2D, Rect2D, RenderingAttachmentInfo};
 use egui::{Context, FullOutput, TextureId, ViewportId};
 use egui_ash_renderer::{DynamicRendering, Options};
 use egui_ash_renderer::vulkan::{create_vulkan_descriptor_set, create_vulkan_descriptor_set_layout};
 use egui_winit::State;
 use crate::app::Window;
 use crate::graphics::Renderer;
-use crate::graphics::renderer::RenderComponent;
-use crate::vulkan::{CommandBuffer, Device, DescriptorPool, Image};
+use crate::graphics::renderer::{RenderComponent, RenderContext};
+use crate::vulkan::{Device, DescriptorPool, Image};
 use std::collections::HashMap;
 use log::{error, trace};
 
@@ -146,7 +146,7 @@ impl RenderComponent for GuiSystem {
         self.texture_layout = Some(create_vulkan_descriptor_set_layout(self.device.as_ref().unwrap().handle()).unwrap());
     }
 
-    fn render(&mut self, renderer: &mut Renderer, command_buffer: &mut CommandBuffer, _: &vk::Image, swapchain_image_view: &ImageView) {
+    fn render(&mut self, ctx: &mut RenderContext) {
 
         if let Some(output) = self.egui_output.take() {
 
@@ -157,7 +157,7 @@ impl RenderComponent for GuiSystem {
             // Set textures
             // https://docs.rs/egui-ash-renderer/0.7.0/egui_ash_renderer/#managed-textures
             self.egui_renderer.as_mut().unwrap().set_textures(
-                renderer.queue, renderer.command_pool.command_pool, output.textures_delta.set.as_slice()
+                *ctx.queue, ctx.command_pool.command_pool, output.textures_delta.set.as_slice()
             ).unwrap();
 
             let clipped_primitives = self.egui_ctx.tessellate(
@@ -171,19 +171,19 @@ impl RenderComponent for GuiSystem {
                     .load_op(AttachmentLoadOp::LOAD)
                     .store_op(AttachmentStoreOp::STORE)
                     .clear_value(ClearValue { color: ClearColorValue { float32: [1f32, 0f32, 1f32, 1f32] } })
-                    .image_view(*swapchain_image_view)
+                    .image_view(*ctx.swapchain_image_view)
             ];
             let rendering_info = vk::RenderingInfoKHR::default()
-                .render_area(Rect2D { offset: Offset2D { x: 0, y: 0 }, extent: renderer.swapchain.get_extent() })
+                .render_area(Rect2D { offset: Offset2D { x: 0, y: 0 }, extent: ctx.swapchain_extent })
                 .layer_count(1)
                 .view_mask(0)
                 .color_attachments(&color_attachments);
-            command_buffer.begin_rendering(&rendering_info);
+            ctx.command_buffer.begin_rendering(&rendering_info);
 
             // Egui draw call
             match self.egui_renderer.as_mut().unwrap().cmd_draw(
-                command_buffer.handle(),
-                renderer.swapchain.get_extent(),
+                ctx.command_buffer.handle(),
+                ctx.swapchain_extent,
                 output.pixels_per_point,
                 clipped_primitives.as_slice()
             ) {
@@ -193,7 +193,7 @@ impl RenderComponent for GuiSystem {
                 }
             }
 
-            command_buffer.end_rendering();
+            ctx.command_buffer.end_rendering();
         }
     }
 }
