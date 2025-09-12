@@ -78,6 +78,18 @@ impl RenderComponent for ComputeRender {
     }
 
     fn render(&mut self, ctx: &mut RenderContext) {
+
+        if self.image.as_ref().unwrap().width != ctx.swapchain_extent.width || self.image.as_ref().unwrap().height != ctx.swapchain_extent.height {
+            // Recreate image
+            self.image = Some(Image::new(
+                &ctx.device,
+                &mut ctx.allocator,
+                ctx.swapchain_extent.width,
+                ctx.swapchain_extent.height,
+                vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST
+            ));
+            ctx.command_buffer.transition_image(self.image.as_ref().unwrap(), vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty(), vk::AccessFlags::empty());
+        }
         
         // Render
         let compute = if !self.pressed {
@@ -216,7 +228,8 @@ fn main() {
         pressed: false,
     }));
     App::run(
-        AppConfig::default(), 
+        AppConfig::default()
+            .resizable(true),
         compute.clone(),
         Some(compute)
     );

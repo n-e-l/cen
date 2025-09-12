@@ -10,6 +10,8 @@ use crate::graphics::pipeline_store::PipelineStore;
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain};
 
 pub struct RenderContext<'a> {
+    pub device: &'a Device,
+    pub allocator: &'a mut Allocator,
     pub pipeline_store: &'a PipelineStore,
     pub command_buffer: &'a mut CommandBuffer,
     pub swapchain_image: &'a vk::Image,
@@ -201,6 +203,8 @@ impl Renderer {
         );
 
         let mut ctx = RenderContext {
+            device: &self.device,
+            allocator: &mut self.allocator,
             pipeline_store: &self.pipeline_store,
             command_buffer: &mut command_buffer,
             swapchain_image: &swapchain_image,
