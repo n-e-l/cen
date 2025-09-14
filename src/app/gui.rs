@@ -80,8 +80,8 @@ impl GuiSystem {
             device,
             *self.texture_layout.as_ref().unwrap(),
             self.renderer_descriptor_pool.as_ref().unwrap().handle(),
-            image.image_view,
-            image.sampler,
+            image.image_view(),
+            image.sampler(),
         ).unwrap();
 
         let texture_id = self.egui_renderer.as_mut().unwrap().add_user_texture(descriptor_set);
@@ -171,10 +171,10 @@ impl RenderComponent for GuiSystem {
                     .load_op(AttachmentLoadOp::LOAD)
                     .store_op(AttachmentStoreOp::STORE)
                     .clear_value(ClearValue { color: ClearColorValue { float32: [1f32, 0f32, 1f32, 1f32] } })
-                    .image_view(*ctx.swapchain_image_view)
+                    .image_view(ctx.swapchain_image.image_view())
             ];
             let rendering_info = vk::RenderingInfoKHR::default()
-                .render_area(Rect2D { offset: Offset2D { x: 0, y: 0 }, extent: ctx.swapchain_extent })
+                .render_area(Rect2D { offset: Offset2D { x: 0, y: 0 }, extent: ctx.swapchain_image.extent() })
                 .layer_count(1)
                 .view_mask(0)
                 .color_attachments(&color_attachments);
@@ -183,7 +183,7 @@ impl RenderComponent for GuiSystem {
             // Egui draw call
             match self.egui_renderer.as_mut().unwrap().cmd_draw(
                 ctx.command_buffer.handle(),
-                ctx.swapchain_extent,
+                ctx.swapchain_image.extent(),
                 output.pixels_per_point,
                 clipped_primitives.as_slice()
             ) {

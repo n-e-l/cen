@@ -7,6 +7,7 @@ use crate::vulkan::{Device, LOG_TARGET};
 pub struct AllocatorInner {
     // IMPORTANT: Ordering matters a lot here. We want to drop the allocator before the device
     pub allocator: Arc<Mutex<gpu_allocator::vulkan::Allocator>>,
+    #[allow(dead_code)]
     pub device_dep: Arc<DeviceInner>,
 }
 

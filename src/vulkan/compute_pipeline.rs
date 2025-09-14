@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::path::PathBuf;
@@ -7,6 +8,7 @@ use ash::vk::PushConstantRange;
 use log::{trace};
 use crate::vulkan::{DescriptorSetLayout, Device, GpuHandle, Pipeline, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
+use crate::vulkan::memory::GpuResource;
 use crate::vulkan::pipeline::{create_shader_module, load_shader_code, PipelineErr};
 
 pub struct ComputePipelineInner {
@@ -45,7 +47,13 @@ impl Pipeline for ComputePipeline {
         self.inner.pipeline_layout
     }
 
-    fn reference(&self) -> Arc<dyn GpuHandle> {
+    fn resource(&self) -> &dyn GpuResource {
+        self
+    }
+}
+
+impl GpuResource for ComputePipeline {
+    fn reference(&self) -> Arc<dyn Any> {
         self.inner.clone()
     }
 }

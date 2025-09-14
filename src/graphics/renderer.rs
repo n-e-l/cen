@@ -7,16 +7,14 @@ use winit::event_loop::EventLoopProxy;
 use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
 use crate::graphics::pipeline_store::PipelineStore;
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain};
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, Instance, Surface, Swapchain};
 
 pub struct RenderContext<'a> {
     pub device: &'a Device,
     pub allocator: &'a mut Allocator,
     pub pipeline_store: &'a PipelineStore,
     pub command_buffer: &'a mut CommandBuffer,
-    pub swapchain_image: &'a vk::Image,
-    pub swapchain_image_view: &'a vk::ImageView,
-    pub swapchain_extent: Extent2D,
+    pub swapchain_image: &'a Image,
     pub queue: &'a Queue,
     pub command_pool: &'a CommandPool
 }
@@ -139,32 +137,15 @@ impl Renderer {
         image_command_buffer.begin();
 
         swapchain.get_images().iter().for_each(|image| {
-            let image_memory_barrier = vk::ImageMemoryBarrier::default()
-                .old_layout(vk::ImageLayout::UNDEFINED)
-                .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-                .src_access_mask(vk::AccessFlags::empty())
-                .dst_access_mask(vk::AccessFlags::empty())
-                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .image(*image)
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                });
-            unsafe {
-                device.handle().cmd_pipeline_barrier(
-                    image_command_buffer.handle(),
-                    vk::PipelineStageFlags::TOP_OF_PIPE,
-                    vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                    vk::DependencyFlags::empty(),
-                    &[],
-                    &[],
-                    &[image_memory_barrier]
-                )
-            }
+            image_command_buffer.image_barrier(
+                image,
+                vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::PRESENT_SRC_KHR,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                vk::AccessFlags::empty(),
+                vk::AccessFlags::empty(),
+            );
         });
         image_command_buffer.end();
 
@@ -178,12 +159,11 @@ impl Renderer {
 
         command_buffer.begin();
 
-        let swapchain_image = self.swapchain.get_images()[image_index];
-        let swapchain_image_view = self.swapchain.get_image_views()[image_index];
+        let swapchain_image = &self.swapchain.get_images()[image_index];
 
         // Clear the swapchain image
-        command_buffer.transition_image(
-            &swapchain_image,
+        command_buffer.image_barrier(
+            swapchain_image,
             ImageLayout::PRESENT_SRC_KHR,
             ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::PipelineStageFlags::TOP_OF_PIPE,
@@ -191,8 +171,8 @@ impl Renderer {
             vk::AccessFlags::empty(),
             vk::AccessFlags::MEMORY_WRITE,
         );
-        command_buffer.clear_color_image(&swapchain_image, ImageLayout::TRANSFER_DST_OPTIMAL, [0.0, 0.0, 0.0, 1.0]);
-        command_buffer.transition_image(
+        command_buffer.clear_color_image(swapchain_image, ImageLayout::TRANSFER_DST_OPTIMAL, [0.0, 0.0, 0.0, 1.0]);
+        command_buffer.image_barrier(
             &swapchain_image,
             ImageLayout::TRANSFER_DST_OPTIMAL,
             ImageLayout::PRESENT_SRC_KHR,
@@ -207,9 +187,7 @@ impl Renderer {
             allocator: &mut self.allocator,
             pipeline_store: &self.pipeline_store,
             command_buffer: &mut command_buffer,
-            swapchain_image: &swapchain_image,
-            swapchain_image_view: &swapchain_image_view,
-            swapchain_extent: self.swapchain.get_extent(),
+            swapchain_image,
             queue: &self.queue,
             command_pool: &self.command_pool,
         };

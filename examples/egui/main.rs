@@ -34,7 +34,15 @@ impl RenderComponent for ComputeRender {
         let mut image_command_buffer = CommandBuffer::new(&renderer.device, &renderer.command_pool, false);
         image_command_buffer.begin();
         {
-            image_command_buffer.transition_image(&image, vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty(), vk::AccessFlags::empty());
+            image_command_buffer.image_barrier(
+                &image,
+                vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::GENERAL,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                vk::AccessFlags::empty(),
+                vk::AccessFlags::empty()
+            );
         }
         image_command_buffer.end();
         renderer.submit_single_time_command_buffer(image_command_buffer);
@@ -79,16 +87,24 @@ impl RenderComponent for ComputeRender {
 
     fn render(&mut self, ctx: &mut RenderContext) {
 
-        if self.image.as_ref().unwrap().width != ctx.swapchain_extent.width || self.image.as_ref().unwrap().height != ctx.swapchain_extent.height {
+        if self.image.as_ref().unwrap().width() != ctx.swapchain_image.width() || self.image.as_ref().unwrap().height() != ctx.swapchain_image.height() {
             // Recreate image
             self.image = Some(Image::new(
                 &ctx.device,
                 &mut ctx.allocator,
-                ctx.swapchain_extent.width,
-                ctx.swapchain_extent.height,
+                ctx.swapchain_image.width(),
+                ctx.swapchain_image.height(),
                 vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST
             ));
-            ctx.command_buffer.transition_image(self.image.as_ref().unwrap(), vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty(), vk::AccessFlags::empty());
+            ctx.command_buffer.image_barrier(
+                self.image.as_ref().unwrap(),
+                vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::GENERAL,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                vk::AccessFlags::empty(),
+                vk::AccessFlags::empty()
+            );
         }
         
         // Render
@@ -117,7 +133,7 @@ impl RenderComponent for ComputeRender {
         ctx.command_buffer.dispatch(500, 500, 1 );
 
         // Transition the render to a source
-        ctx.command_buffer.transition_image(
+        ctx.command_buffer.image_barrier(
             self.image.as_ref().unwrap(),
             vk::ImageLayout::GENERAL,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
@@ -128,7 +144,7 @@ impl RenderComponent for ComputeRender {
         );
 
         // Transition the swapchain image
-        ctx.command_buffer.transition_image(
+        ctx.command_buffer.image_barrier(
             ctx.swapchain_image,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
@@ -147,18 +163,18 @@ impl RenderComponent for ComputeRender {
 
         // Use a blit, as a copy doesn't synchronize properly to the swapchain on MoltenVK
         ctx.command_buffer.blit_image(
-            *self.image.as_ref().unwrap().handle(),
+            self.image.as_ref().unwrap(),
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            *ctx.swapchain_image,
+            ctx.swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             &[vk::ImageBlit::default()
                 .src_offsets([
                     vk::Offset3D::default(),
-                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width as i32).y(self.image.as_ref().unwrap().height as i32).z(1)
+                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width() as i32).y(self.image.as_ref().unwrap().height() as i32).z(1)
                 ])
                 .dst_offsets([
                     vk::Offset3D::default(),
-                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width as i32).y(self.image.as_ref().unwrap().height as i32).z(1)
+                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width() as i32).y(self.image.as_ref().unwrap().height() as i32).z(1)
                 ])
                 .src_subresource(
                     vk::ImageSubresourceLayers::default()
@@ -179,7 +195,7 @@ impl RenderComponent for ComputeRender {
         );
 
         // Transfer back to default states
-        ctx.command_buffer.transition_image(
+        ctx.command_buffer.image_barrier(
             ctx.swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
@@ -190,7 +206,7 @@ impl RenderComponent for ComputeRender {
         );
 
         // Transition the render image back
-        ctx.command_buffer.transition_image(
+        ctx.command_buffer.image_barrier(
             self.image.as_ref().unwrap(),
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::ImageLayout::GENERAL,

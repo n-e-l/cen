@@ -36,7 +36,7 @@ impl RenderComponent for ComputeRender {
     fn render(&mut self, ctx: &mut RenderContext) {
 
         // Transition the swapchain image
-        ctx.command_buffer.transition_image(
+        ctx.command_buffer.image_barrier(
             ctx.swapchain_image,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
@@ -79,7 +79,7 @@ impl RenderComponent for ComputeRender {
         );
 
         // Transfer back to default states
-        ctx.command_buffer.transition_image(
+        ctx.command_buffer.image_barrier(
             ctx.swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::PRESENT_SRC_KHR,

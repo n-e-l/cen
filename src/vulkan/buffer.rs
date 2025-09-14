@@ -1,11 +1,13 @@
+use std::any::Any;
 use std::sync::{Arc, Mutex, MutexGuard};
 use ash::vk;
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
 use log::{trace};
-use crate::vulkan::{Allocator, Device, GpuHandle, LOG_TARGET};
+use crate::vulkan::{Allocator, Device, LOG_TARGET};
 use crate::vulkan::allocator::AllocatorInner;
 use crate::vulkan::device::DeviceInner;
+use crate::vulkan::memory::GpuResource;
 
 pub struct BufferInner {
     pub device_dep: Arc<DeviceInner>,
@@ -34,13 +36,14 @@ impl Drop for BufferInner {
     }
 }
 
-impl GpuHandle for BufferInner {}
 
-impl Buffer {
-    pub(crate) fn reference(&self) -> Arc<dyn GpuHandle> {
+impl GpuResource for Buffer {
+    fn reference(&self) -> Arc<dyn Any> {
         self.inner.clone()
     }
+}
 
+impl Buffer {
     pub fn new(device: &Device, allocator: &mut Allocator, location: MemoryLocation, size: vk::DeviceSize, buffer_usage_flags: vk::BufferUsageFlags) -> Buffer {
 
         // Image

@@ -4,17 +4,18 @@ use ash::vk;
 use ash::vk::{CompositeAlphaFlagsKHR, ImageUsageFlags, PresentModeKHR, SharingMode, SurfaceFormatKHR, SwapchainKHR};
 use log::{debug, info};
 use crate::graphics::renderer::WindowState;
-use crate::vulkan::{Device, Instance, Surface, LOG_TARGET};
+use crate::vulkan;
+use crate::vulkan::{Device, Image, Instance, Surface, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
 
 /// Vulkan does not have a concept of a "default framebuffer". Instead, we need a framework that "owns" the images that will eventually be presented to the screen.
 /// The general purpose of the swapchain is to synchronize the presentation of images with the refresh rate of the screen.
 pub struct SwapchainInner {
+    #[allow(dead_code)]
     device_dep: Arc<DeviceInner>,
     swapchain_loader: swapchain::Device,
     swapchain: vk::SwapchainKHR,
-    images: Vec<vk::Image>,
-    image_views: Vec<vk::ImageView>,
+    images: Vec<vulkan::Image>,
     extent: vk::Extent2D,
     format: SurfaceFormatKHR
 }
@@ -22,9 +23,6 @@ pub struct SwapchainInner {
 impl Drop for SwapchainInner {
     fn drop(&mut self) {
         unsafe {
-            for &image_view in self.image_views.iter() {
-                self.device_dep.device.destroy_image_view(image_view, None);
-            }
             self.swapchain_loader.destroy_swapchain(self.swapchain, None)
         }
     }
@@ -118,39 +116,15 @@ impl Swapchain {
 
         let swapchain = unsafe { swapchain_loader.create_swapchain(&create_info, None).unwrap() };
 
-        let images = unsafe { swapchain_loader.get_swapchain_images(swapchain).unwrap() };
-
-        let mut image_views = Vec::new();
-        for &image in images.iter() {
-            let image_view_create_info = vk::ImageViewCreateInfo::default()
-                .flags(vk::ImageViewCreateFlags::empty())
-                .format(surface_format.format)
-                .view_type(vk::ImageViewType::TYPE_2D)
-                .components(vk::ComponentMapping {
-                    r: vk::ComponentSwizzle::IDENTITY,
-                    g: vk::ComponentSwizzle::IDENTITY,
-                    b: vk::ComponentSwizzle::IDENTITY,
-                    a: vk::ComponentSwizzle::IDENTITY,
-                })
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                })
-                .image(image);
-
-            let imageview = unsafe { device.handle().create_image_view(&image_view_create_info, None).unwrap() };
-            image_views.push(imageview);
-        }
+        let images = unsafe { swapchain_loader.get_swapchain_images(swapchain).unwrap() }.iter()
+            .map(|&image| vulkan::Image::from_raw(device, image, surface_format.format, extent))
+            .collect::<Vec<vulkan::Image>>();
 
         let swapchain_inner = SwapchainInner {
             device_dep: device.inner.clone(),
             swapchain_loader,
             swapchain,
             images,
-            image_views,
             extent,
             format: *surface_format
         };
@@ -160,12 +134,12 @@ impl Swapchain {
         }
     }
 
-    pub fn get_images(&self) -> &Vec<vk::Image> {
+    pub fn get_images(&self) -> &Vec<Image> {
         &self.inner.images
     }
 
-    pub fn get_image_views(&self) -> &Vec<vk::ImageView> {
-        &self.inner.image_views
+    pub fn get_image_views(&self) -> Vec<vk::ImageView> {
+        self.inner.images.iter().map(|i| i.image_view()).collect()
     }
 
     pub fn get_image_count(&self) -> u32 {

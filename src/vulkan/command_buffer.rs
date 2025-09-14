@@ -1,15 +1,16 @@
+use std::any::Any;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use ash::vk::{BufferImageCopy, DeviceSize, FenceCreateFlags, ImageAspectFlags, ImageCopy, ImageLayout, WriteDescriptorSet};
-use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, GpuHandle, Image, Pipeline, RenderPass};
+use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, Image, Pipeline, RenderPass};
 use crate::vulkan::device::DeviceInner;
-use std::borrow::Borrow;
+use crate::vulkan::memory::GpuResource;
 
 pub struct CommandBufferInner {
     device_dep: Arc<DeviceInner>,
     command_buffer: vk::CommandBuffer,
     in_flight_fence: vk::Fence,
-    resource_handles: Mutex<Vec<Arc<dyn GpuHandle>>>,
+    resource_handles: Mutex<Vec<Arc<dyn Any>>>,
 }
 
 pub struct CommandBuffer {
@@ -60,6 +61,11 @@ impl CommandBuffer {
         }
     }
 
+    fn track(&mut self, resource: &dyn GpuResource ) {
+        let mut lock = self.inner.resource_handles.lock().expect("Failed to lock mutex");
+        lock.push(resource.reference());
+    }
+
     pub fn begin(&mut self) {
         let command_buffer_begin_info = vk::CommandBufferBeginInfo::default();
         unsafe {
@@ -80,7 +86,9 @@ impl CommandBuffer {
         }
     }
 
-    pub fn begin_render_pass(&self, render_pass: &RenderPass, framebuffer: &Framebuffer) {
+    pub fn begin_render_pass(&mut self, render_pass: &RenderPass, framebuffer: &Framebuffer) {
+        self.track(render_pass);
+        
         let render_pass_begin_info = vk::RenderPassBeginInfo::default()
             .render_area(vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
@@ -113,9 +121,9 @@ impl CommandBuffer {
         }
     }
 
-    pub fn transition_image<T>(
-        &self,
-        image: T,
+    pub fn image_barrier<'a>(
+        &mut self,
+        image: &Image,
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
         src_stage_mask: vk::PipelineStageFlags,
@@ -123,9 +131,9 @@ impl CommandBuffer {
         src_access_flags: vk::AccessFlags,
         dst_access_flags: vk::AccessFlags,
     )
-    where
-        T: Borrow<vk::Image>
     {
+        self.track(image);
+
         let image_memory_barrier = vk::ImageMemoryBarrier::default()
             .old_layout(old_layout)
             .new_layout(new_layout)
@@ -133,7 +141,7 @@ impl CommandBuffer {
             .dst_access_mask(dst_access_flags)
             .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
             .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .image(*image.borrow())
+            .image(*image.handle())
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask: ImageAspectFlags::COLOR,
                 base_mip_level: 0,
@@ -154,12 +162,15 @@ impl CommandBuffer {
         }
     }
 
-    pub fn bind_push_descriptor_images(&self, pipeline: &dyn Pipeline, images: &Vec<&Image>) {
+    pub fn bind_push_descriptor_images(&mut self, pipeline: &dyn Pipeline, images: &Vec<&Image>) {
+        self.track(pipeline.resource());
+        images.iter().for_each(|image| self.track(*image));
+
         let bindings = images.iter().map(|image| {
             vk::DescriptorImageInfo::default()
                 .image_layout(vk::ImageLayout::GENERAL)
-                .image_view(image.image_view)
-                .sampler(image.sampler)
+                .image_view(image.image_view())
+                .sampler(image.sampler())
         }).collect::<Vec<vk::DescriptorImageInfo>>();
 
         let write_descriptor_set = WriteDescriptorSet::default()
@@ -179,13 +190,15 @@ impl CommandBuffer {
         }
     }
 
-    pub fn bind_push_descriptor_image(&self, pipeline: &dyn Pipeline, image: &Image) {
+    pub fn bind_push_descriptor_image(&mut self, pipeline: &dyn Pipeline, image: &Image) {
+        self.track(image);
+        self.track(pipeline.resource());
 
         // TODO: Set bindings dynamically
         let bindings = [vk::DescriptorImageInfo::default()
             .image_layout(vk::ImageLayout::GENERAL)
-            .image_view(image.image_view)
-            .sampler(image.sampler)];
+            .image_view(image.image_view())
+            .sampler(image.sampler())];
 
         let write_descriptor_set = WriteDescriptorSet::default()
             .dst_binding(0)
@@ -204,7 +217,9 @@ impl CommandBuffer {
         }
     }
 
-    pub fn bind_push_descriptor(&self, pipeline: &dyn Pipeline, set: u32, write_descriptor_sets: &[WriteDescriptorSet]) {
+    pub fn bind_push_descriptor(&mut self, pipeline: &dyn Pipeline, set: u32, write_descriptor_sets: &[WriteDescriptorSet]) {
+        self.track(pipeline.resource());
+
         unsafe {
             self.inner.device_dep.device_push_descriptor.cmd_push_descriptor_set(
                 self.inner.command_buffer,
@@ -223,7 +238,9 @@ impl CommandBuffer {
         }
     }
 
-    pub fn push_constants(&self, pipeline: &dyn Pipeline, stage_flags: vk::ShaderStageFlags, offset: u32, data: &[u8]) {
+    pub fn push_constants(&mut self, pipeline: &dyn Pipeline, stage_flags: vk::ShaderStageFlags, offset: u32, data: &[u8]) {
+        self.track(pipeline.resource());
+
         unsafe {
             self.inner.device_dep.device
                 .cmd_push_constants(self.inner.command_buffer, pipeline.layout(), stage_flags, offset, data);
@@ -244,10 +261,10 @@ impl CommandBuffer {
         }
     }
 
-    pub fn clear_color_image<T>(&self, image: T, layout: ImageLayout, color: [f32; 4])
-    where
-        T: Borrow<vk::Image>
+    pub fn clear_color_image<'a>(&mut self, image: &Image, layout: ImageLayout, color: [f32; 4])
     {
+        self.track(image);
+
         unsafe {
             let mut clear_color_value = vk::ClearColorValue::default();
             clear_color_value.float32 = color;
@@ -260,7 +277,7 @@ impl CommandBuffer {
             self.inner.device_dep.device
                 .cmd_clear_color_image(
                     self.inner.command_buffer,
-                    *image.borrow(),
+                    *image.handle(),
                     layout,
                     &clear_color_value,
                     &sub_resource_ranges
@@ -268,16 +285,17 @@ impl CommandBuffer {
         }
     }
 
-    pub fn blit_image<T>(&self, src_image: T, src_layout: ImageLayout, dst_image: T, dst_layout: ImageLayout, regions: &[vk::ImageBlit], filter: vk::Filter)
-    where
-        T: Borrow<vk::Image>
+    pub fn blit_image<'a>(&mut self, src_image: &Image, src_layout: ImageLayout, dst_image: &Image, dst_layout: ImageLayout, regions: &[vk::ImageBlit], filter: vk::Filter)
     {
+        self.track(src_image);
+        self.track(dst_image);
+
         unsafe {
             self.inner.device_dep.device.cmd_blit_image(
                 self.inner.command_buffer,
-                *src_image.borrow(),
+                *src_image.handle(),
                 src_layout,
-                *dst_image.borrow(),
+                *dst_image.handle(),
                 dst_layout,
                 regions,
                 filter,
@@ -286,11 +304,12 @@ impl CommandBuffer {
     }
 
     pub fn bind_pipeline(&mut self, pipeline: &dyn Pipeline) {
+        self.track(pipeline.resource());
+
         unsafe {
             self.inner.device_dep.device
                 .cmd_bind_pipeline(self.inner.command_buffer, pipeline.bind_point(), pipeline.handle());
         }
-        self.inner.resource_handles.lock().expect("Failed to lock mutex").push(pipeline.reference())
     }
 
     pub fn dispatch(&self, x: u32, y: u32, z: u32) {
@@ -300,7 +319,9 @@ impl CommandBuffer {
         }
     }
     
-    pub fn fill_buffer(&self, buffer: &Buffer, offset: DeviceSize, size: DeviceSize, data: u32) {
+    pub fn fill_buffer(&mut self, buffer: &Buffer, offset: DeviceSize, size: DeviceSize, data: u32) {
+        self.track(buffer);
+
         unsafe {
             self.inner.device_dep.device
                 .cmd_fill_buffer(
@@ -311,31 +332,29 @@ impl CommandBuffer {
                     data
                 );
         }
-        
-        let mut lock = self.inner.resource_handles.lock().expect("Failed to lock mutex");
-        lock.push(buffer.reference());
     }
 
-    pub fn copy_buffer_to_image<T>(&self, buffer: &Buffer, image: T, layout: ImageLayout, regions: &[BufferImageCopy])
-    where
-        T: Borrow<vk::Image>
+    pub fn copy_buffer_to_image(&mut self, buffer: &Buffer, image: &Image, layout: ImageLayout, regions: &[BufferImageCopy])
     {
+        self.track(buffer);
+        self.track(image);
+
         unsafe {
             self.inner.device_dep.device
                 .cmd_copy_buffer_to_image(
                     self.inner.command_buffer,
                     *buffer.handle(),
-                    *image.borrow(),
+                    *image.handle(),
                     layout,
                     regions
                 );
         }
-        
-        let mut lock = self.inner.resource_handles.lock().expect("Failed to lock mutex");
-        lock.push(buffer.reference());
     }
 
-    pub fn copy_image_to_buffer(&self, image: &Image, layout: ImageLayout, buffer: &Buffer, regions: &[BufferImageCopy]) {
+    pub fn copy_image_to_buffer(&mut self, image: &Image, layout: ImageLayout, buffer: &Buffer, regions: &[BufferImageCopy]) {
+        self.track(image);
+        self.track(buffer);
+
         unsafe {
             self.inner.device_dep.device
                 .cmd_copy_image_to_buffer(
@@ -346,12 +365,12 @@ impl CommandBuffer {
                     regions
                 );
         }
-        
-        let mut lock = self.inner.resource_handles.lock().expect("Failed to lock mutex");
-        lock.push(buffer.reference());
     }
     
-    pub fn copy_image(&self, from: &Image, from_layout: ImageLayout, to: &Image, to_layout: ImageLayout, regions: &[ImageCopy]) {
+    pub fn copy_image(&mut self, from: &Image, from_layout: ImageLayout, to: &Image, to_layout: ImageLayout, regions: &[ImageCopy]) {
+        self.track(from);
+        self.track(to);
+
         unsafe {
             self.inner.device_dep.device
                 .cmd_copy_image(
@@ -366,7 +385,7 @@ impl CommandBuffer {
     }
     
     pub fn buffer_barrier(
-        &self,
+        &mut self,
         src_stage_mask: vk::PipelineStageFlags,
         dst_stage_mask: vk::PipelineStageFlags,
         src_access_mask: vk::AccessFlags,
@@ -376,6 +395,8 @@ impl CommandBuffer {
         offset: vk::DeviceSize,
         buffer: &Buffer
     ) {
+        self.track(buffer);
+
         unsafe {
             self.inner.device_dep.device
                 .cmd_pipeline_barrier(
@@ -398,44 +419,9 @@ impl CommandBuffer {
         }
     }
 
-    pub fn image_barrier(
-        &self,
-        src_stage_mask: vk::PipelineStageFlags,
-        dst_stage_mask: vk::PipelineStageFlags,
-        src_access_mask: vk::AccessFlags,
-        dst_access_mask: vk::AccessFlags,
-        dependency_flags: vk::DependencyFlags,
-        image: &Image
-    ) {
-        unsafe {
-            self.inner.device_dep.device
-                .cmd_pipeline_barrier(
-                    self.inner.command_buffer,
-                    src_stage_mask,
-                    dst_stage_mask,
-                    dependency_flags,
-                    &[],
-                    &[],
-                    &[vk::ImageMemoryBarrier::default()
-                        .subresource_range(vk::ImageSubresourceRange::default()
-                            .aspect_mask(vk::ImageAspectFlags::COLOR)
-                            .base_array_layer(0)
-                            .base_mip_level(0)
-                            .layer_count(1)
-                            .level_count(1))
-                        .old_layout(vk::ImageLayout::GENERAL)
-                        .new_layout(vk::ImageLayout::GENERAL)
-                        .src_access_mask(src_access_mask)
-                        .dst_access_mask(dst_access_mask)
-                        .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                        .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                        .image(*image.handle())
-                    ]
-                );
-        }
-    }
+    pub fn bind_descriptor_sets(&mut self, pipeline: &dyn Pipeline, descriptor_sets: &[vk::DescriptorSet]) {
+        self.track(pipeline.resource());
 
-    pub fn bind_descriptor_sets(&self, pipeline: &dyn Pipeline, descriptor_sets: &[vk::DescriptorSet]) {
         unsafe {
             self.inner.device_dep.device
                 .cmd_bind_descriptor_sets(

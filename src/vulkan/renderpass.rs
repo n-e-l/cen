@@ -1,8 +1,10 @@
+use std::any::Any;
 use std::sync::Arc;
 use ash::{vk};
 use log::trace;
 use crate::vulkan::{Device, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
+use crate::vulkan::memory::GpuResource;
 
 pub struct RenderPassInner {
     pub renderpass: vk::RenderPass,
@@ -21,6 +23,12 @@ impl Drop for RenderPassInner {
 
 pub struct RenderPass {
     pub inner: Arc<RenderPassInner>,
+}
+
+impl GpuResource for RenderPass {
+    fn reference(&self) -> Arc<dyn Any> {
+        self.inner.clone()
+    }
 }
 
 impl RenderPass {

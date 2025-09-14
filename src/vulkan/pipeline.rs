@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 use std::{fmt, fs};
 use std::path::PathBuf;
-use std::sync::Arc;
 use ash::vk;
 use ash::vk::ShaderModule;
 use log::{trace};
-use crate::vulkan::{GpuHandle, LOG_TARGET};
+use crate::vulkan::{LOG_TARGET};
+use crate::vulkan::memory::GpuResource;
 
 pub trait Pipeline {
     fn handle(&self) -> vk::Pipeline;
     fn bind_point(&self) -> vk::PipelineBindPoint;
     fn layout(&self) -> vk::PipelineLayout;
-    fn reference(&self) -> Arc<dyn GpuHandle>;
+    fn resource(&self) -> &dyn GpuResource;
 }
 
 pub fn create_shader_module(device: &ash::Device, code: Vec<u32>) -> ShaderModule {

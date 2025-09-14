@@ -1,50 +1,130 @@
+use std::any::Any;
 use std::sync::{Arc, Mutex};
-use std::borrow::Borrow;
 use ash::vk;
-use ash::vk::{ComponentMapping, ImageAspectFlags};
+use ash::vk::{ComponentMapping, Extent2D, ImageAspectFlags};
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
 use log::{trace};
 use crate::vulkan::{Allocator, Device, LOG_TARGET};
 use crate::vulkan::allocator::AllocatorInner;
 use crate::vulkan::device::DeviceInner;
+use crate::vulkan::memory::GpuResource;
 
-pub struct Image {
+enum ImageOrigin {
+    External,
+    Created
+}
+
+struct ImageInner {
     pub device_dep: Arc<DeviceInner>,
-    pub allocator_dep: Arc<Mutex<AllocatorInner>>,
+    pub allocator_dep: Option<Arc<Mutex<AllocatorInner>>>,
     pub(crate) image: vk::Image,
     pub(crate) image_view: vk::ImageView,
     pub(crate) sampler: vk::Sampler,
     pub width: u32,
     pub height: u32,
-    pub allocation: Option<Allocation>,
+    pub allocation: Mutex<Option<Allocation>>,
+    origin: ImageOrigin,
+}
+
+pub struct Image {
+    inner: Arc<ImageInner>,
 }
 
 
 impl Drop for Image {
     fn drop(&mut self) {
         unsafe {
-            let image_addr = format!("{:?}", self.image);
-            self.device_dep.device.destroy_sampler(self.sampler, None);
-            self.device_dep.device.destroy_image_view(self.image_view, None);
-            if let Some(allocation) = self.allocation.take() {
-                let memory_addr = format!("{:?}, {:?}", allocation.memory(), allocation.chunk_id());
-                self.allocator_dep.lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
-                trace!(target: LOG_TARGET, "Destroyed image memory: [{}]", memory_addr)
+            match self.inner.origin {
+                ImageOrigin::External => {
+                    let image_addr = format!("{:?}", self.inner.image);
+                    self.inner.device_dep.device.destroy_sampler(self.inner.sampler, None);
+                    self.inner.device_dep.device.destroy_image_view(self.inner.image_view, None);
+
+                    if let Some(allocation) = self.inner.allocation.lock().unwrap().take() {
+                        let memory_addr = format!("{:?}, {:?}", allocation.memory(), allocation.chunk_id());
+                        self.inner.allocator_dep.as_ref().expect("").lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
+                        trace!(target: LOG_TARGET, "Destroyed image memory: [{}]", memory_addr);
+                    }
+
+                    // Don't destroy the image, it's external
+                    trace!(target: LOG_TARGET, "Destroyed external image data: [{}]", image_addr);
+                }
+                ImageOrigin::Created => {
+                    let image_addr = format!("{:?}", self.inner.image);
+                    self.inner.device_dep.device.destroy_sampler(self.inner.sampler, None);
+                    self.inner.device_dep.device.destroy_image_view(self.inner.image_view, None);
+
+                    if let Some(allocation) = self.inner.allocation.lock().unwrap().take() {
+                        let memory_addr = format!("{:?}, {:?}", allocation.memory(), allocation.chunk_id());
+                        self.inner.allocator_dep.as_ref().expect("").lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
+                        trace!(target: LOG_TARGET, "Destroyed image memory: [{}]", memory_addr);
+                    }
+
+                    self.inner.device_dep.device.destroy_image(self.inner.image, None);
+                    trace!(target: LOG_TARGET, "Destroyed image: [{}]", image_addr);
+                }
             }
-            self.device_dep.device.destroy_image(self.image, None);
-            trace!(target: LOG_TARGET, "Destroyed image: [{}]", image_addr);
         }
     }
 }
 
-impl Borrow<vk::Image> for &Image {
-    fn borrow(&self) -> &vk::Image {
-        &self.image
+impl GpuResource for Image {
+    fn reference(&self) -> Arc<dyn Any> {
+        self.inner.clone()
     }
 }
 
 impl Image {
+
+    pub fn from_raw(device: &Device, image: vk::Image, format: vk::Format, extent: Extent2D) -> Image {
+        // Image view
+        let image_view_create_info = vk::ImageViewCreateInfo::default()
+            .format(format)
+            .image(image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .components(ComponentMapping {
+                r: vk::ComponentSwizzle::R,
+                g: vk::ComponentSwizzle::G,
+                b: vk::ComponentSwizzle::B,
+                a: vk::ComponentSwizzle::A,
+            })
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+
+        let image_view = unsafe {
+            device.handle().create_image_view(&image_view_create_info, None)
+                .expect("Failed to create image")
+        };
+
+        let sampler_create_info = vk::SamplerCreateInfo::default();
+
+        // Sampler
+        let sampler = unsafe {
+            device.handle().create_sampler(&sampler_create_info, None)
+                .expect("Failed to create sampler")
+        };
+
+        Image {
+            inner: Arc::new(ImageInner {
+                image,
+                image_view,
+                sampler,
+                allocation: Mutex::new(None),
+                device_dep: device.inner.clone(),
+                allocator_dep: None,
+                width: extent.width,
+                height: extent.height,
+                origin: ImageOrigin::External,
+            })
+        }
+    }
+
     pub fn new(device: &Device, allocator: &mut Allocator, width: u32, height: u32, image_usage_flags: vk::ImageUsageFlags) -> Image {
 
         // Image
@@ -119,33 +199,52 @@ impl Image {
         };
 
         Image {
-            image,
-            image_view,
-            sampler,
-            allocation: Some(allocation),
-            device_dep: device.inner.clone(),
-            allocator_dep: allocator.inner.clone(),
-            width,
-            height
+            inner: Arc::new(ImageInner {
+                image,
+                image_view,
+                sampler,
+                allocation: Mutex::new(Some(allocation)),
+                device_dep: device.inner.clone(),
+                allocator_dep: Some(allocator.inner.clone()),
+                width,
+                height,
+                origin: ImageOrigin::Created,
+            })
         }
     }
 
     pub fn binding(&self, layout: vk::ImageLayout) -> vk::DescriptorImageInfo {
        vk::DescriptorImageInfo::default()
             .image_layout(layout)
-            .image_view(self.image_view)
-            .sampler(self.sampler)
+            .image_view(self.inner.image_view)
+            .sampler(self.inner.sampler)
     }
 
     pub fn handle(&self) -> &vk::Image {
-        &self.image
+        &self.inner.image
     }
 
     pub fn image_view(&self) -> vk::ImageView {
-        self.image_view
+        self.inner.image_view
     }
 
     pub fn sampler(&self) -> vk::Sampler {
-        self.sampler
+        self.inner.sampler
+    }
+
+    pub fn width(&self) -> u32 {
+        self.inner.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.inner.height
+    }
+
+    pub fn extent(&self) -> Extent2D {
+        Extent2D {
+            width: self.inner.width,
+            height: self.inner.height,
+        }
     }
 }
+
