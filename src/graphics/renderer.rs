@@ -81,7 +81,6 @@ impl Renderer {
 
         info!("Creating initial swapchain");
         let swapchain = Swapchain::new(&instance, &physical_device, &device, &window, &surface, present_mode, None);
-        Self::transition_swapchain_images(&device, &command_pool, &queue, &swapchain);
 
         let command_buffers = (0..swapchain.get_image_count()).map(|_| {
             CommandBuffer::new(&device, &command_pool, true)
@@ -128,31 +127,8 @@ impl Renderer {
         info!("Recreating swapchain");
         self.device.wait_idle();
         self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
-        Self::transition_swapchain_images(&self.device, &self.command_pool, &self.queue, &self.swapchain);
     }
 
-    fn transition_swapchain_images(device: &Device, command_pool: &CommandPool, queue: &Queue, swapchain: &Swapchain) {
-        let mut image_command_buffer = CommandBuffer::new(device, command_pool, false);
-
-        image_command_buffer.begin();
-
-        swapchain.get_images().iter().for_each(|image| {
-            image_command_buffer.image_barrier(
-                image,
-                vk::ImageLayout::UNDEFINED,
-                vk::ImageLayout::PRESENT_SRC_KHR,
-                vk::PipelineStageFlags::TOP_OF_PIPE,
-                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                vk::AccessFlags::empty(),
-                vk::AccessFlags::empty(),
-            );
-        });
-        image_command_buffer.end();
-
-        device.submit_single_time_command(*queue, &image_command_buffer);
-        device.wait_for_fence(image_command_buffer.fence());
-    }
-    
     fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &mut [&mut dyn RenderComponent]) {
 
         let mut command_buffer = self.command_buffers[frame_index].clone();
@@ -164,7 +140,7 @@ impl Renderer {
         // Clear the swapchain image
         command_buffer.image_barrier(
             swapchain_image,
-            ImageLayout::PRESENT_SRC_KHR,
+            ImageLayout::UNDEFINED,
             ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::PipelineStageFlags::TOP_OF_PIPE,
             vk::PipelineStageFlags::TRANSFER,
