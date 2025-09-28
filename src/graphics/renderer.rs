@@ -16,7 +16,14 @@ pub struct RenderContext<'a> {
     pub command_buffer: &'a mut CommandBuffer,
     pub swapchain_image: &'a Image,
     pub queue: &'a Queue,
-    pub command_pool: &'a CommandPool
+    pub command_pool: &'a CommandPool,
+    on_finish: &'a mut Vec<Box<dyn FnOnce()>>
+}
+
+impl RenderContext<'_> {
+    pub fn run_on_finish(&mut self, fun: Box<dyn FnOnce()>) {
+        self.on_finish.push(fun);
+    }
 }
 
 pub trait RenderComponent {
@@ -29,6 +36,7 @@ pub struct Renderer {
     pub render_finished_semaphores: Vec<vk::Semaphore>,
     pub image_available_semaphores: Vec<vk::Semaphore>,
     pub command_buffers: Vec<CommandBuffer>,
+    pub on_finish_functions: Vec<Vec<Box<dyn FnOnce()>>>,
     pub command_pool: CommandPool,
     pub queue: Queue,
     pub swapchain: Swapchain,
@@ -41,7 +49,6 @@ pub struct Renderer {
     pub instance: Instance,
     pub start_time: Instant,
     present_mode: vk::PresentModeKHR,
-    cb_callbacks: Vec<(CommandBuffer, Box<dyn FnOnce()>)>
 }
 
 pub struct WindowState<'a> {
@@ -98,6 +105,10 @@ impl Renderer {
                 .expect("Failed to create semaphore")
         }).collect::<Vec<vk::Semaphore>>();
 
+        let on_finish_functions = (0..swapchain.get_image_count()).map(|_| {
+            vec![]
+        }).collect::<Vec<Vec<Box<dyn FnOnce()>>>>();
+
         let pipeline_store = PipelineStore::new( &device, proxy );
 
         let start_time = std::time::Instant::now();
@@ -115,11 +126,11 @@ impl Renderer {
             image_available_semaphores,
             command_pool,
             command_buffers,
+            on_finish_functions,
             pipeline_store,
             frame_index: 0,
             start_time,
             present_mode,
-            cb_callbacks: Default::default()
         }
     }
 
@@ -166,6 +177,7 @@ impl Renderer {
             swapchain_image,
             queue: &self.queue,
             command_pool: &self.command_pool,
+            on_finish: &mut self.on_finish_functions[frame_index]
         };
 
         for rc in render_components.iter_mut() {
@@ -175,25 +187,7 @@ impl Renderer {
         command_buffer.end();
     }
 
-    fn update_callbacks(&mut self) {
-        // Get the indices to remove
-        let mut remove_indices = Vec::new();
-        self.cb_callbacks.iter().enumerate().for_each(|(index, (cb, _callback))| {
-            if self.device.get_fence_status(cb.fence()) {
-                remove_indices.push(index);
-            }
-        });
-
-        // Remove and execute callbacks
-        for i in remove_indices.iter().rev() {
-            let (_, callback) = self.cb_callbacks.swap_remove(*i);
-
-            callback();
-        }
-    }
-
     pub fn update(&mut self) {
-        self.update_callbacks();
     }
 
     pub fn draw_frame(&mut self, render_component: &mut [&mut dyn RenderComponent]) {
@@ -202,13 +196,15 @@ impl Renderer {
         let fence = self.command_buffers[self.frame_index].fence();
         self.device.wait_for_fence(fence);
 
+        // Run the finish functions
+        for f in self.on_finish_functions[self.frame_index].drain(..) {
+            f();
+        }
+
         // Acquire image and signal the semaphore
         let image_index = self.swapchain.acquire_next_image(self.image_available_semaphores[self.frame_index]) as usize;
 
         self.record_command_buffer(self.frame_index, image_index, render_component);
-
-        // Run any wait signals
-        self.update_callbacks();
 
         self.device.reset_fence(fence);
         self.device.submit_command_buffer(
@@ -233,19 +229,6 @@ impl Renderer {
 
     pub fn create_command_buffer(&mut self) -> CommandBuffer {
         CommandBuffer::new(&self.device, &self.command_pool, false)
-    }
-
-    pub fn add_command_buffer_callback(&mut self, command_buffer: CommandBuffer, callback: Box<dyn FnOnce()>) {
-        self.cb_callbacks.push((command_buffer, callback));
-    }
-
-    pub fn submit_single_time_command_buffer(&mut self, command_buffer: CommandBuffer) {
-        // Transmit
-        self.device.submit_single_time_command(
-            self.queue,
-            &command_buffer
-        );
-        self.device.wait_for_fence(command_buffer.fence());
     }
 }
 
