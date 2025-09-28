@@ -32,18 +32,18 @@ pub struct Image {
 }
 
 
-impl Drop for Image {
+impl Drop for ImageInner {
     fn drop(&mut self) {
         unsafe {
-            match self.inner.origin {
+            match self.origin {
                 ImageOrigin::External => {
-                    let image_addr = format!("{:?}", self.inner.image);
-                    self.inner.device_dep.device.destroy_sampler(self.inner.sampler, None);
-                    self.inner.device_dep.device.destroy_image_view(self.inner.image_view, None);
+                    let image_addr = format!("{:?}", self.image);
+                    self.device_dep.device.destroy_sampler(self.sampler, None);
+                    self.device_dep.device.destroy_image_view(self.image_view, None);
 
-                    if let Some(allocation) = self.inner.allocation.lock().unwrap().take() {
+                    if let Some(allocation) = self.allocation.lock().unwrap().take() {
                         let memory_addr = format!("{:?}, {:?}", allocation.memory(), allocation.chunk_id());
-                        self.inner.allocator_dep.as_ref().expect("").lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
+                        self.allocator_dep.as_ref().expect("").lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
                         trace!(target: LOG_TARGET, "Destroyed image memory: [{}]", memory_addr);
                     }
 
@@ -51,17 +51,17 @@ impl Drop for Image {
                     trace!(target: LOG_TARGET, "Destroyed external image data: [{}]", image_addr);
                 }
                 ImageOrigin::Created => {
-                    let image_addr = format!("{:?}", self.inner.image);
-                    self.inner.device_dep.device.destroy_sampler(self.inner.sampler, None);
-                    self.inner.device_dep.device.destroy_image_view(self.inner.image_view, None);
+                    let image_addr = format!("{:?}", self.image);
+                    self.device_dep.device.destroy_sampler(self.sampler, None);
+                    self.device_dep.device.destroy_image_view(self.image_view, None);
 
-                    if let Some(allocation) = self.inner.allocation.lock().unwrap().take() {
+                    if let Some(allocation) = self.allocation.lock().unwrap().take() {
                         let memory_addr = format!("{:?}, {:?}", allocation.memory(), allocation.chunk_id());
-                        self.inner.allocator_dep.as_ref().expect("").lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
+                        self.allocator_dep.as_ref().expect("").lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
                         trace!(target: LOG_TARGET, "Destroyed image memory: [{}]", memory_addr);
                     }
 
-                    self.inner.device_dep.device.destroy_image(self.inner.image, None);
+                    self.device_dep.device.destroy_image(self.image, None);
                     trace!(target: LOG_TARGET, "Destroyed image: [{}]", image_addr);
                 }
             }
