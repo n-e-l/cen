@@ -6,7 +6,7 @@ use cen::app::App;
 use cen::app::app::AppConfig;
 use cen::graphics::Renderer;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
-use cen::vulkan::{CommandBuffer, DescriptorSetLayout, Image};
+use cen::vulkan::{DescriptorSetLayout, Image};
 
 #[allow(dead_code)]
 struct ComputeRender {
@@ -25,15 +25,6 @@ impl RenderComponent for ComputeRender {
             renderer.swapchain.get_extent().height,
             vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST
         );
-
-        // Transition image
-        let mut image_command_buffer = CommandBuffer::new(&renderer.device, &renderer.command_pool, false);
-        image_command_buffer.begin();
-        {
-            image_command_buffer.image_barrier(&image, vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty(), vk::AccessFlags::empty());
-        }
-        image_command_buffer.end();
-        renderer.submit_single_time_command_buffer(image_command_buffer);
 
         // Layout
         let layout_bindings = &[
