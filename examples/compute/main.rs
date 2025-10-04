@@ -2,28 +2,29 @@ use std::sync::{Arc, Mutex};
 use cen::graphics::pipeline_store::{PipelineConfig, PipelineKey};
 use ash::vk;
 use ash::vk::WriteDescriptorSet;
-use cen::app::App;
+use cen::app::Cen;
 use cen::app::app::AppConfig;
 use cen::app::component::{Component, ComponentRegistry};
-use cen::graphics::Renderer;
+use cen::app::engine::InitContext;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{DescriptorSetLayout, Image};
 
 #[allow(dead_code)]
 struct ComputeRender {
-    image: Option<Image>,
-    descriptorset: Option<DescriptorSetLayout>,
-    pipeline: Option<PipelineKey>,
+    image: Image,
+    descriptorset: DescriptorSetLayout,
+    pipeline: PipelineKey,
 }
 
-impl RenderComponent for ComputeRender {
-    fn initialize(&mut self, renderer: &mut Renderer) {
+impl ComputeRender {
+    pub fn new(ctx: &mut InitContext) -> Self {
+
         // Image
         let image = Image::new(
-            &renderer.device,
-            &mut renderer.allocator,
-            renderer.swapchain.get_extent().width,
-            renderer.swapchain.get_extent().height,
+            &ctx.device,
+            &mut ctx.allocator,
+            ctx.swapchain_extent.width,
+            ctx.swapchain_extent.height,
             vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST
         );
 
@@ -36,12 +37,12 @@ impl RenderComponent for ComputeRender {
                 .stage_flags(vk::ShaderStageFlags::COMPUTE ),
         ];
         let descriptorset = DescriptorSetLayout::new_push_descriptor(
-            &renderer.device,
+            &ctx.device,
             layout_bindings
         );
 
         // Pipeline
-        let pipeline = renderer.pipeline_store().insert(PipelineConfig {
+        let pipeline = ctx.pipeline_store.insert(PipelineConfig {
             shader_path: "examples/compute/shader.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
@@ -50,24 +51,28 @@ impl RenderComponent for ComputeRender {
             macros: Default::default(),
         }).expect("Failed to create pipeline");
 
-        self.image = Some(image);
-        self.descriptorset = Some(descriptorset);
-        self.pipeline = Some(pipeline);
+        Self {
+            image,
+            pipeline,
+            descriptorset
+        }
     }
+}
 
+impl RenderComponent for ComputeRender {
     fn render(&mut self, ctx: &mut RenderContext) {
 
-        if self.image.as_ref().unwrap().width() != ctx.swapchain_image.width() || self.image.as_ref().unwrap().height() != ctx.swapchain_image.height() {
+        if self.image.width() != ctx.swapchain_image.width() || self.image.height() != ctx.swapchain_image.height() {
             // Recreate image
-            self.image = Some(Image::new(
+            self.image = Image::new(
                 &ctx.device,
                 &mut ctx.allocator,
                 ctx.swapchain_image.width(),
                 ctx.swapchain_image.height(),
                 vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST
-            ));
+            );
             ctx.command_buffer.image_barrier(
-                self.image.as_ref().unwrap(),
+                &self.image,
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::GENERAL,
                 vk::PipelineStageFlags::TOP_OF_PIPE,
@@ -78,10 +83,10 @@ impl RenderComponent for ComputeRender {
         }
 
         // Render
-        let compute = ctx.pipeline_store.get(self.pipeline.unwrap()).unwrap();
+        let compute = ctx.pipeline_store.get(self.pipeline).unwrap();
         ctx.command_buffer.bind_pipeline(&compute);
 
-        let bindings = [self.image.as_ref().unwrap().binding(vk::ImageLayout::GENERAL)];
+        let bindings = [self.image.binding(vk::ImageLayout::GENERAL)];
 
         let write_descriptor_set = WriteDescriptorSet::default()
             .dst_binding(0)
@@ -98,7 +103,7 @@ impl RenderComponent for ComputeRender {
 
         // Transition the render to a source
         ctx.command_buffer.image_barrier(
-            self.image.as_ref().unwrap(),
+            &self.image,
             vk::ImageLayout::GENERAL,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::PipelineStageFlags::COMPUTE_SHADER,
@@ -127,18 +132,18 @@ impl RenderComponent for ComputeRender {
 
         // Use a blit, as a copy doesn't synchronize properly to the swapchain on MoltenVK
         ctx.command_buffer.blit_image(
-            self.image.as_ref().unwrap(),
+            &self.image,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             ctx.swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             &[vk::ImageBlit::default()
                 .src_offsets([
                     vk::Offset3D::default(),
-                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width() as i32).y(self.image.as_ref().unwrap().height() as i32).z(1)
+                    vk::Offset3D::default().x(self.image.width() as i32).y(self.image.height() as i32).z(1)
                 ])
                 .dst_offsets([
                     vk::Offset3D::default(),
-                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width() as i32).y(self.image.as_ref().unwrap().height() as i32).z(1)
+                    vk::Offset3D::default().x(self.image.width() as i32).y(self.image.height() as i32).z(1)
                 ])
                 .src_subresource(
                     vk::ImageSubresourceLayers::default()
@@ -171,7 +176,7 @@ impl RenderComponent for ComputeRender {
 
         // Transition the render image back
         ctx.command_buffer.image_barrier(
-            self.image.as_ref().unwrap(),
+            &self.image,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::ImageLayout::GENERAL,
             vk::PipelineStageFlags::TRANSFER,
@@ -184,17 +189,12 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
-    let compute = Arc::new(Mutex::new(ComputeRender {
-        image: None,
-        descriptorset: None,
-        pipeline: None,
-    }));
-
-    let registry = ComponentRegistry::new()
-        .register(Component::Render(compute));
-
-    App::run(
+    Cen::run(
         AppConfig::default(), 
-        registry
+        Box::new(|ctx| {
+            let compute = Arc::new(Mutex::new(ComputeRender::new(ctx)));
+            ComponentRegistry::new()
+                .register(Component::Render(compute))
+        })
     );
 }

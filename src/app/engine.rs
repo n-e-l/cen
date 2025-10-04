@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
+use ash::vk::{Extent2D, Queue};
 use log::{debug, error, info};
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
@@ -7,8 +8,10 @@ use crate::app::app::{AppConfig, UserEvent};
 use crate::app::gui::{GuiSystem};
 use crate::app::component::{ComponentRegistry};
 use crate::app::Window;
+use crate::graphics::pipeline_store::PipelineStore;
 use crate::graphics::Renderer;
-use crate::graphics::renderer::{RenderComponent, WindowState};
+use crate::graphics::renderer::{WindowState};
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device};
 
 /**
  * ## Cen engine
@@ -25,9 +28,21 @@ pub struct Engine {
     pub registry: ComponentRegistry,
 }
 
+pub struct InitContext<'a> {
+    pub gui_system: &'a mut GuiSystem,
+    pub device: &'a Device,
+    pub allocator: &'a mut Allocator,
+    pub pipeline_store: &'a mut PipelineStore,
+    pub command_buffer: &'a mut CommandBuffer,
+    pub swapchain_extent: Extent2D,
+    pub queue: &'a Queue,
+    pub command_pool: &'a CommandPool,
+}
+pub type InitCallback = Box<dyn FnOnce(&mut InitContext) -> ComponentRegistry>;
+
 impl Engine {
 
-    pub fn new(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig, registry: ComponentRegistry) -> Engine {
+    pub fn new(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig, init_callback: InitCallback) -> Engine {
 
         // Create the graphics context
         let window = Box::new(Window::create(event_loop, "cen", app_config.width, app_config.height, app_config.fullscreen, app_config.resizable));
@@ -41,18 +56,23 @@ impl Engine {
         };
         let mut renderer = Renderer::new(&window_state, proxy, app_config.vsync);
 
-        registry.render_components().iter().for_each(|component| {
-            component.lock().unwrap().initialize(&mut renderer);
-        });
+        let mut gui_system = GuiSystem::new(window.as_ref(), &mut renderer);
 
-        // Initialize gui renderer
-        let mut gui_system = GuiSystem::new(window.as_ref());
-        gui_system.initialize(&mut renderer);
-
-        // Initialize gui component
-        registry.gui_components().iter().for_each(|component| {
-            component.lock().as_mut().unwrap().initialize_gui(&mut gui_system);
-        });
+        let mut command_buffer = renderer.create_command_buffer();
+        command_buffer.begin();
+        let mut init_context = InitContext {
+            gui_system: &mut gui_system,
+            device: &renderer.device,
+            allocator: &mut renderer.allocator,
+            pipeline_store: &mut renderer.pipeline_store,
+            command_buffer: &mut command_buffer,
+            swapchain_extent: renderer.swapchain.get_extent(),
+            queue: &renderer.queue,
+            command_pool: &renderer.command_pool,
+        };
+        let registry: ComponentRegistry = init_callback(&mut init_context);
+        command_buffer.end();
+        renderer.submit_single_time_command_buffer(command_buffer);
 
         Engine {
             _start_time: SystemTime::now(),

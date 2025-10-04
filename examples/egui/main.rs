@@ -3,31 +3,31 @@ use cen::graphics::pipeline_store::{PipelineConfig, PipelineKey};
 use ash::vk;
 use ash::vk::WriteDescriptorSet;
 use egui::Context;
-use cen::app::App;
-use cen::app::app::AppConfig;
+use cen::app::app::{AppConfig, Cen};
 use cen::app::gui::{GuiComponent, GuiSystem};
 use cen::app::component::{Component, ComponentRegistry};
-use cen::graphics::Renderer;
+use cen::app::engine::InitContext;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{DescriptorSetLayout, Image};
 
 #[allow(dead_code)]
 struct ComputeRender {
-    image: Option<Image>,
-    descriptorset: Option<DescriptorSetLayout>,
-    pipeline_a: Option<PipelineKey>,
-    pipeline_b: Option<PipelineKey>,
+    image: Image,
+    descriptorset: DescriptorSetLayout,
+    pipeline_a: PipelineKey,
+    pipeline_b: PipelineKey,
     pressed: bool,
 }
 
-impl RenderComponent for ComputeRender {
-    fn initialize(&mut self, renderer: &mut Renderer) {
+impl ComputeRender {
+    fn new(ctx: &mut InitContext) -> Self {
+
         // Image
         let image = Image::new(
-            &renderer.device,
-            &mut renderer.allocator,
-            renderer.swapchain.get_extent().width,
-            renderer.swapchain.get_extent().height,
+            &ctx.device,
+            &mut ctx.allocator,
+            ctx.swapchain_extent.width,
+            ctx.swapchain_extent.height,
             vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST
         );
 
@@ -40,12 +40,12 @@ impl RenderComponent for ComputeRender {
                 .stage_flags(vk::ShaderStageFlags::COMPUTE ),
         ];
         let descriptorset = DescriptorSetLayout::new_push_descriptor(
-            &renderer.device,
+            &ctx.device,
             layout_bindings
         );
 
         // Pipeline
-        let pipeline_a = renderer.pipeline_store().insert(PipelineConfig {
+        let pipeline_a = ctx.pipeline_store.insert(PipelineConfig {
             shader_path: "examples/egui/shader_a.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
@@ -53,8 +53,8 @@ impl RenderComponent for ComputeRender {
             push_constant_ranges: vec![],
             macros: Default::default(),
         }).expect("Failed to create pipeline");
-        
-        let pipeline_b = renderer.pipeline_store().insert(PipelineConfig {
+
+        let pipeline_b = ctx.pipeline_store.insert(PipelineConfig {
             shader_path: "examples/egui/shader_b.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
@@ -63,44 +63,51 @@ impl RenderComponent for ComputeRender {
             macros: Default::default(),
         }).expect("Failed to create pipeline");
 
-        self.image = Some(image);
-        self.descriptorset = Some(descriptorset);
-        self.pipeline_a = Some(pipeline_a);
-        self.pipeline_b = Some(pipeline_b);
+        Self {
+            image,
+            descriptorset,
+            pipeline_a,
+            pipeline_b,
+            pressed: false,
+        }
     }
 
+}
+
+impl RenderComponent for ComputeRender {
     fn render(&mut self, ctx: &mut RenderContext) {
 
-        if self.image.as_ref().unwrap().width() != ctx.swapchain_image.width() || self.image.as_ref().unwrap().height() != ctx.swapchain_image.height() {
+        if self.image.width() != ctx.swapchain_image.width() || self.image.height() != ctx.swapchain_image.height() {
             // Recreate image
-            self.image = Some(Image::new(
+            self.image = Image::new(
                 &ctx.device,
                 &mut ctx.allocator,
                 ctx.swapchain_image.width(),
                 ctx.swapchain_image.height(),
                 vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST
-            ));
-            ctx.command_buffer.image_barrier(
-                self.image.as_ref().unwrap(),
-                vk::ImageLayout::UNDEFINED,
-                vk::ImageLayout::GENERAL,
-                vk::PipelineStageFlags::TOP_OF_PIPE,
-                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                vk::AccessFlags::empty(),
-                vk::AccessFlags::empty()
             );
         }
-        
+
+        ctx.command_buffer.image_barrier(
+            &self.image,
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::GENERAL,
+            vk::PipelineStageFlags::TOP_OF_PIPE,
+            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+            vk::AccessFlags::empty(),
+            vk::AccessFlags::empty()
+        );
+
         // Render
         let compute = if !self.pressed {
-            ctx.pipeline_store.get(self.pipeline_a.unwrap()).unwrap()
+            ctx.pipeline_store.get(self.pipeline_a).unwrap()
         } else {
-            ctx.pipeline_store.get(self.pipeline_b.unwrap()).unwrap()
+            ctx.pipeline_store.get(self.pipeline_b).unwrap()
         };
-        
+
         ctx.command_buffer.bind_pipeline(&compute);
 
-        let bindings = [self.image.as_ref().unwrap().binding(vk::ImageLayout::GENERAL)];
+        let bindings = [self.image.binding(vk::ImageLayout::GENERAL)];
 
         let write_descriptor_set = WriteDescriptorSet::default()
             .dst_binding(0)
@@ -113,12 +120,12 @@ impl RenderComponent for ComputeRender {
             0,
             &[write_descriptor_set]
         );
-        
+
         ctx.command_buffer.dispatch(500, 500, 1 );
 
         // Transition the render to a source
         ctx.command_buffer.image_barrier(
-            self.image.as_ref().unwrap(),
+            &self.image,
             vk::ImageLayout::GENERAL,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::PipelineStageFlags::COMPUTE_SHADER,
@@ -130,7 +137,7 @@ impl RenderComponent for ComputeRender {
         // Transition the swapchain image
         ctx.command_buffer.image_barrier(
             ctx.swapchain_image,
-            vk::ImageLayout::PRESENT_SRC_KHR,
+            vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::PipelineStageFlags::TOP_OF_PIPE,
             vk::PipelineStageFlags::TRANSFER,
@@ -147,18 +154,18 @@ impl RenderComponent for ComputeRender {
 
         // Use a blit, as a copy doesn't synchronize properly to the swapchain on MoltenVK
         ctx.command_buffer.blit_image(
-            self.image.as_ref().unwrap(),
+            &self.image,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             ctx.swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             &[vk::ImageBlit::default()
                 .src_offsets([
                     vk::Offset3D::default(),
-                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width() as i32).y(self.image.as_ref().unwrap().height() as i32).z(1)
+                    vk::Offset3D::default().x(self.image.width() as i32).y(self.image.height() as i32).z(1)
                 ])
                 .dst_offsets([
                     vk::Offset3D::default(),
-                    vk::Offset3D::default().x(self.image.as_ref().unwrap().width() as i32).y(self.image.as_ref().unwrap().height() as i32).z(1)
+                    vk::Offset3D::default().x(self.image.width() as i32).y(self.image.height() as i32).z(1)
                 ])
                 .src_subresource(
                     vk::ImageSubresourceLayers::default()
@@ -191,7 +198,7 @@ impl RenderComponent for ComputeRender {
 
         // Transition the render image back
         ctx.command_buffer.image_barrier(
-            self.image.as_ref().unwrap(),
+            &self.image,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::ImageLayout::GENERAL,
             vk::PipelineStageFlags::TRANSFER,
@@ -204,9 +211,6 @@ impl RenderComponent for ComputeRender {
 }
 
 impl GuiComponent for ComputeRender {
-    fn initialize_gui(&mut self, _: &mut GuiSystem) {
-    }
-
     fn gui(&mut self, _: &GuiSystem, ctx: &Context) {
         egui::Window::new("Shader controls")
             .resizable(true)
@@ -219,22 +223,15 @@ impl GuiComponent for ComputeRender {
 }
 
 fn main() {
-    
-    let compute = Arc::new(Mutex::new(ComputeRender {
-        image: None,
-        descriptorset: None,
-        pipeline_a: None,
-        pipeline_b: None,
-        pressed: false,
-    }));
 
-    let registry = ComponentRegistry::new()
-        .register(Component::Render(compute.clone()))
-        .register(Component::Gui(compute.clone()));
-
-    App::run(
+    Cen::run(
         AppConfig::default()
             .resizable(true),
-        registry
+        Box::new(|ctx| {
+            let compute = Arc::new(Mutex::new(ComputeRender::new(ctx)));
+            ComponentRegistry::new()
+                .register(Component::Render(compute.clone()))
+                .register(Component::Gui(compute.clone()))
+        })
     );
 }

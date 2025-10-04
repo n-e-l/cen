@@ -13,40 +13,37 @@ use std::sync::{Arc, Mutex};
 use log::{error, trace};
 
 pub trait GuiComponent {
-    fn initialize_gui(&mut self, gui: &mut GuiSystem);
     fn gui(&mut self, gui: &GuiSystem, context: &Context);
 }
 
 pub struct GuiSystem {
     pub egui_ctx: Context,
     pub egui_winit: State,
-    pub egui_renderer: Option<egui_ash_renderer::Renderer>,
-    device: Option<Device>,
-    renderer_descriptor_pool: Option<DescriptorPool>,
+    pub egui_renderer: egui_ash_renderer::Renderer,
+    device: Device,
+    renderer_descriptor_pool: DescriptorPool,
     egui_output: Option<FullOutput>,
-    texture_layout: Option<DescriptorSetLayout>,
+    texture_layout: DescriptorSetLayout,
     user_textures: HashMap<TextureId, DescriptorSet>,
 }
 
 impl Drop for GuiSystem {
     fn drop(&mut self) {
         for (id, _) in self.user_textures.iter() {
-            self.egui_renderer.as_mut().unwrap().remove_user_texture(*id);
+            self.egui_renderer.remove_user_texture(*id);
             trace!("Destroyed user texture {:?}", id);
         }
-        if let Some(device) = self.device.as_ref() {
-            unsafe {
-                device.handle().destroy_descriptor_set_layout(self.texture_layout.unwrap(), None);
-                trace!("Destroyed gui image descriptor set layout {:?}", self.texture_layout.unwrap());
-            }
+        unsafe {
+            self.device.handle().destroy_descriptor_set_layout(self.texture_layout, None);
+            trace!("Destroyed gui image descriptor set layout {:?}", self.texture_layout);
         }
     }
 }
 
 impl GuiSystem {
 
-    pub fn new(window: &Window) -> Self {
-        
+    pub fn new(window: &Window, renderer: &mut Renderer) -> Self {
+
         let egui_ctx = Context::default();
 
         // Enable image loading
@@ -62,30 +59,58 @@ impl GuiSystem {
             None,
             None
         );
-        
+
+        // Renderer values
+
+        let device = renderer.device.clone();
+        let renderer_descriptor_pool = DescriptorPool::new(&renderer.device, 10000);
+
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        let preferred_format = vk::Format::R8G8B8A8_SRGB;
+
+        #[cfg(target_os = "macos")]
+        let preferred_format = vk::Format::B8G8R8A8_SRGB;
+
+        let egui_renderer = egui_ash_renderer::Renderer::with_gpu_allocator(
+            renderer.allocator.inner.lock().unwrap().allocator.clone(),
+            renderer.device.handle().clone(),
+            DynamicRendering {
+                color_attachment_format: preferred_format,
+                depth_attachment_format: None,
+            },
+            Options {
+                in_flight_frames: renderer.swapchain.get_image_count() as usize,
+                enable_depth_test: false,
+                enable_depth_write: false,
+                srgb_framebuffer: true
+            }
+        ).unwrap();
+
+        let texture_layout = create_vulkan_descriptor_set_layout(renderer.device.handle()).unwrap();
+
         Self {
             egui_ctx,
             egui_winit,
-            egui_renderer: None,
+            egui_renderer,
             egui_output: None,
-            device: None,
-            renderer_descriptor_pool: None,
-            texture_layout: None,
+            device,
+            renderer_descriptor_pool,
+            texture_layout,
             user_textures: HashMap::new(),
         }
     }
 
     pub fn create_texture(&mut self, image: &Image) -> TextureId {
-        let device = self.device.as_ref().unwrap().handle();
+        let device = self.device.handle();
         let descriptor_set = create_vulkan_descriptor_set(
             device,
-            *self.texture_layout.as_ref().unwrap(),
-            self.renderer_descriptor_pool.as_ref().unwrap().handle(),
+            self.texture_layout,
+            self.renderer_descriptor_pool.handle(),
             image.image_view(),
             image.sampler(),
         ).unwrap();
 
-        let texture_id = self.egui_renderer.as_mut().unwrap().add_user_texture(descriptor_set);
+        let texture_id = self.egui_renderer.add_user_texture(descriptor_set);
 
         self.user_textures.insert(texture_id, descriptor_set);
 
@@ -95,15 +120,15 @@ impl GuiSystem {
     pub fn remove_texture(&mut self, texture_id: TextureId) {
         unsafe {
             let set = self.user_textures.remove(&texture_id).unwrap();
-            self.device.as_ref().unwrap().handle().free_descriptor_sets(self.renderer_descriptor_pool.as_ref().unwrap().descriptor_pool, &[set]).unwrap();
+            self.device.handle().free_descriptor_sets(self.renderer_descriptor_pool.descriptor_pool, &[set]).unwrap();
         }
-        self.egui_renderer.as_mut().unwrap().remove_user_texture(texture_id);
+        self.egui_renderer.remove_user_texture(texture_id);
     }
 
     pub fn on_window_event(&mut self, window: &winit::window::Window, event: &winit::event::WindowEvent) {
         let _ = self.egui_winit.on_window_event(window, event);
     }
-    
+
     pub fn update(&mut self, window: &winit::window::Window, components: &mut [Arc<Mutex<dyn GuiComponent>>]) {
 
         // Renew gui
@@ -118,46 +143,17 @@ impl GuiSystem {
 
 impl RenderComponent for GuiSystem {
 
-    fn initialize(&mut self, renderer: &mut Renderer) {
-        
-        self.device = Some(renderer.device.clone());
-        self.renderer_descriptor_pool = Some(DescriptorPool::new(&renderer.device, 10000));
-
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
-        let preferred_format = vk::Format::R8G8B8A8_SRGB;
-
-        #[cfg(target_os = "macos")]
-        let preferred_format = vk::Format::B8G8R8A8_SRGB;
-
-        self.egui_renderer = Some(egui_ash_renderer::Renderer::with_gpu_allocator(
-            renderer.allocator.inner.lock().unwrap().allocator.clone(),
-            renderer.device.handle().clone(),
-            DynamicRendering {
-                color_attachment_format: preferred_format,
-                depth_attachment_format: None,
-            },
-            Options {
-                in_flight_frames: renderer.swapchain.get_image_count() as usize,
-                enable_depth_test: false,
-                enable_depth_write: false,
-                srgb_framebuffer: true
-            }
-        ).unwrap());
-
-        self.texture_layout = Some(create_vulkan_descriptor_set_layout(self.device.as_ref().unwrap().handle()).unwrap());
-    }
-
     fn render(&mut self, ctx: &mut RenderContext) {
 
         if let Some(output) = self.egui_output.take() {
 
             // Free textures
-            self.egui_renderer.as_mut().unwrap()
+            self.egui_renderer
                 .free_textures(output.textures_delta.free.as_slice()).unwrap();
 
             // Set textures
             // https://docs.rs/egui-ash-renderer/0.7.0/egui_ash_renderer/#managed-textures
-            self.egui_renderer.as_mut().unwrap().set_textures(
+            self.egui_renderer.set_textures(
                 *ctx.queue, ctx.command_pool.command_pool, output.textures_delta.set.as_slice()
             ).unwrap();
 
@@ -182,7 +178,7 @@ impl RenderComponent for GuiSystem {
             ctx.command_buffer.begin_rendering(&rendering_info);
 
             // Egui draw call
-            match self.egui_renderer.as_mut().unwrap().cmd_draw(
+            match self.egui_renderer.cmd_draw(
                 ctx.command_buffer.handle(),
                 ctx.swapchain_image.extent(),
                 output.pixels_per_point,

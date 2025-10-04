@@ -2,23 +2,23 @@ use std::sync::{Arc, Mutex};
 use ash::vk;
 use ash::vk::{BufferImageCopy, BufferUsageFlags, DeviceSize, Extent3D, ImageLayout, ImageSubresourceLayers};
 use gpu_allocator::MemoryLocation;
-use cen::app::App;
+use cen::app::Cen;
 use cen::app::app::AppConfig;
 use cen::app::component::{Component, ComponentRegistry};
-use cen::graphics::Renderer;
+use cen::app::engine::InitContext;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{Buffer};
 
 struct ComputeRender {
-    buffer: Option<Buffer>,
+    buffer: Buffer,
 }
 
-impl RenderComponent for ComputeRender {
-    fn initialize(&mut self, renderer: &mut Renderer) {
+impl ComputeRender {
+    fn new(ctx: &mut InitContext) -> Self {
         // Image
         let buffer = Buffer::new(
-            &renderer.device,
-            &mut renderer.allocator,
+            &ctx.device,
+            &mut ctx.allocator,
             MemoryLocation::CpuToGpu,
             2000 * 2000 * 4,
             BufferUsageFlags::TRANSFER_SRC
@@ -31,14 +31,19 @@ impl RenderComponent for ComputeRender {
             }
         }
 
-        self.buffer = Some(buffer);
+        Self {
+            buffer
+        }
     }
+}
+
+impl RenderComponent for ComputeRender {
 
     fn render(&mut self, ctx: &mut RenderContext) {
 
-        if self.buffer.as_ref().unwrap().size() != (ctx.swapchain_image.width() * ctx.swapchain_image.height() * 4) as u64 {
+        if self.buffer.size() != (ctx.swapchain_image.width() * ctx.swapchain_image.height() * 4) as u64 {
             // Recreate image
-            let buffer = Buffer::new(
+            self.buffer = Buffer::new(
                 &ctx.device,
                 &mut ctx.allocator,
                 MemoryLocation::CpuToGpu,
@@ -47,13 +52,11 @@ impl RenderComponent for ComputeRender {
             );
 
             {
-                let mut mem = buffer.mapped().unwrap();
+                let mut mem = self.buffer.mapped().unwrap();
                 for i in mem.as_mut_slice() {
                     *i = 255u8;
                 }
             }
-
-            self.buffer = Some(buffer);
         }
 
         // Transition the swapchain image
@@ -75,7 +78,7 @@ impl RenderComponent for ComputeRender {
         );
 
         ctx.command_buffer.copy_buffer_to_image(
-            self.buffer.as_ref().unwrap(),
+            &self.buffer,
             ctx.swapchain_image,
             ImageLayout::TRANSFER_DST_OPTIMAL,
             &[
@@ -114,16 +117,14 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
-    let compute = Arc::new(Mutex::new(ComputeRender {
-        buffer: None
-    }));
 
-    let registry = ComponentRegistry::new()
-        .register(Component::Render(compute));
-
-    App::run(
+    Cen::run(
         AppConfig::default(),
-        registry
+        Box::new(|ctx| {
+            let compute = Arc::new(Mutex::new(ComputeRender::new(ctx)));
+            ComponentRegistry::new()
+                .register(Component::Render(compute))
+        })
     );
 }
 

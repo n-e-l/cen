@@ -28,7 +28,6 @@ impl RenderContext<'_> {
 }
 
 pub trait RenderComponent {
-    fn initialize(&mut self, renderer: &mut Renderer);
     fn render(&mut self, ctx: &mut RenderContext);
 }
 
@@ -227,6 +226,14 @@ impl Renderer {
 
     pub fn create_command_buffer(&mut self) -> CommandBuffer {
         CommandBuffer::new(&self.device, &self.command_pool, false)
+    }
+
+    pub fn submit_single_time_command_buffer(&mut self, command_buffer: CommandBuffer) {
+        self.device.submit_single_time_command(
+            self.queue,
+            &command_buffer
+        );
+        self.device.wait_for_fence(command_buffer.fence());
     }
 }
 

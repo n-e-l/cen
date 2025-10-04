@@ -5,20 +5,20 @@ use log::{LevelFilter};
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::window::WindowId;
-use crate::app::component::ComponentRegistry;
-use crate::app::engine::Engine;
+use crate::app::engine::{Engine, InitCallback};
 
 /**
  * Entrypoint of a cen application.
  * Listens to and passes eventloop events to the engine.
  */
-pub struct App
+pub struct Cen
 {
     pub proxy: EventLoopProxy<UserEvent>,
     pub app_config: AppConfig,
     engine: Option<Engine>,
-    pub registry: Option<ComponentRegistry>,
+    pub init_callback: Option<InitCallback>,
 }
+
 
 pub struct AppConfig {
     pub(crate) width: u32,
@@ -81,7 +81,7 @@ pub enum UserEvent {
     GlslUpdate(PathBuf),
 }
 
-impl ApplicationHandler<UserEvent> for App
+impl ApplicationHandler<UserEvent> for Cen
 {
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         if let Some(ref mut engine) = self.engine {
@@ -97,7 +97,7 @@ impl ApplicationHandler<UserEvent> for App
                 self.proxy.clone(),
                 event_loop,
                 &self.app_config,
-                self.registry.take().unwrap()
+                self.init_callback.take().unwrap()
             ));
         }
 
@@ -108,7 +108,7 @@ impl ApplicationHandler<UserEvent> for App
             engine.user_event(even_loop, event);
         }
     }
-    
+
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         if let Some(engine) = self.engine.as_mut() {
             engine.window_event(event_loop, event);
@@ -134,7 +134,7 @@ impl ApplicationHandler<UserEvent> for App
     }
 }
 
-impl App {
+impl Cen {
 
     fn init_logger() {
         let env = Env::default()
@@ -154,20 +154,20 @@ impl App {
             .filter(Some("egui_winit"), LevelFilter::Error)
             .init();
     }
-    
-    fn new(app_config: AppConfig, event_loop: &EventLoop<UserEvent>, registry: ComponentRegistry) -> Self {
-        
+
+    fn new(app_config: AppConfig, event_loop: &EventLoop<UserEvent>, init_callback: InitCallback) -> Self {
+
         let proxy = event_loop.create_proxy();
 
-        App {
+        Cen {
             app_config,
             proxy,
-            registry: Some(registry),
+            init_callback: Some(init_callback),
             engine: None,
         }
     }
-    
-    pub fn run(app_config: AppConfig, registry: ComponentRegistry) {
+
+    pub fn run(app_config: AppConfig, init_callback: InitCallback) {
 
         Self::init_logger();
 
@@ -175,7 +175,7 @@ impl App {
         event_loop.set_control_flow(ControlFlow::Poll);
 
         // App setup
-        let mut app = App::new(app_config, &event_loop, registry);
+        let mut app = Cen::new(app_config, &event_loop, init_callback);
         event_loop.run_app(&mut app).unwrap();
     }
 

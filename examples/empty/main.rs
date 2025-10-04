@@ -1,9 +1,11 @@
-use cen::app::app::{App, AppConfig};
+use cen::app::app::{Cen, AppConfig};
 use cen::app::component::ComponentRegistry;
 
 fn main() {
-    App::run(
+    Cen::run(
         AppConfig::default(),
-        ComponentRegistry::new(),
+        Box::new(|_| {
+            ComponentRegistry::new()
+        })
     );
 }
