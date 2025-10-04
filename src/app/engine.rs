@@ -56,8 +56,10 @@ impl Engine {
         };
         let mut renderer = Renderer::new(&window_state, proxy, app_config.vsync);
 
+        // Setup gui
         let mut gui_system = GuiSystem::new(window.as_ref(), &mut renderer);
 
+        // Initialize the user components
         let mut command_buffer = renderer.create_command_buffer();
         command_buffer.begin();
         let mut init_context = InitContext {
