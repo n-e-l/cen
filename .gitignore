@@ -1,6 +1,7 @@
 # Project files
 .idea/
 .direnv/
+.envrc
 
 # will have compiled files and executables
 debug/
