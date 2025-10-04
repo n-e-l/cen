@@ -188,9 +188,6 @@ impl Renderer {
         command_buffer.end();
     }
 
-    pub fn update(&mut self) {
-    }
-
     pub fn draw_frame(&mut self, render_components: &[Arc<Mutex<dyn RenderComponent>>]) {
 
         // Wait for the current frame's command buffer to finish executing.

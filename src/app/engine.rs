@@ -150,8 +150,6 @@ impl Engine {
             self.registry.gui_components().as_mut_slice()
         );
 
-        self.renderer.update();
-        
         // Render all our components
         let mut draw_components = self.registry.render_components();
         draw_components.push(self.gui_system.clone());
