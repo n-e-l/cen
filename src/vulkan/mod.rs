@@ -16,7 +16,7 @@ mod buffer;
 mod memory;
 mod descriptor_pool;
 
-pub(crate) const LOG_TARGET: &'static str = "cen::vulkan";
+pub(crate) const LOG_TARGET: &str = "cen::vulkan";
 
 pub use self::allocator::Allocator;
 pub use self::buffer::Buffer;

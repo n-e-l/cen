@@ -11,6 +11,12 @@ pub struct ComponentRegistry {
     storage: Vec<Component>
 }
 
+impl Default for ComponentRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ComponentRegistry {
     pub fn new() -> Self {
         Self { storage: Vec::new() }

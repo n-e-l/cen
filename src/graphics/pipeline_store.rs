@@ -59,9 +59,7 @@ impl PipelineStore {
         move |event| match event {
             Ok(events) => {
                 if let Some(e) = events
-                    .iter()
-                    .filter(|e| e.kind == Any)
-                    .next()
+                    .iter().find(|e| e.kind == Any)
                 {
                     event_loop_proxy.send_event(
                         UserEvent::GlslUpdate(e.path.clone())
@@ -83,8 +81,8 @@ impl PipelineStore {
         let pipeline = ComputePipeline::new(
             &inner.device,
             config.shader_path.clone(),
-            &config.descriptor_set_layouts.as_slice(),
-            &config.push_constant_ranges.as_slice(),
+            config.descriptor_set_layouts.as_slice(),
+            config.push_constant_ranges.as_slice(),
             &config.macros
         )?;
 
@@ -110,8 +108,8 @@ impl PipelineStore {
                 let pipeline = ComputePipeline::new(
                     &device,
                     config.shader_path.clone(),
-                    &config.descriptor_set_layouts.as_slice(),
-                    &config.push_constant_ranges.as_slice(),
+                    config.descriptor_set_layouts.as_slice(),
+                    config.push_constant_ranges.as_slice(),
                     &config.macros
                 )?;
                 handle.1.pipeline = pipeline;

@@ -110,7 +110,7 @@ impl GuiSystem {
         let raw_input = self.egui_winit.take_egui_input(window);
         self.egui_output = Some(self.egui_ctx.run(raw_input, |ctx| {
             for component in &mut *components {
-                component.lock().unwrap().gui(&self, ctx);
+                component.lock().unwrap().gui(self, ctx);
             }
         }));
     }

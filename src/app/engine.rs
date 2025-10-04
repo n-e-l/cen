@@ -30,7 +30,7 @@ impl Engine {
     pub fn new(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig, registry: ComponentRegistry) -> Engine {
 
         // Create the graphics context
-        let window = Box::new(Window::create(&event_loop, "cen", app_config.width, app_config.height, app_config.fullscreen, app_config.resizable));
+        let window = Box::new(Window::create(event_loop, "cen", app_config.width, app_config.height, app_config.fullscreen, app_config.resizable));
 
         // Setup renderer
         let window_state = WindowState {

@@ -151,7 +151,7 @@ impl GraphicsPipeline {
         let desc_layouts = layouts
             .iter().map(|layout| layout.handle()).collect::<Vec<_>>();
         let create_info = vk::PipelineLayoutCreateInfo::default()
-            .set_layouts(&*desc_layouts);
+            .set_layouts(&desc_layouts);
         let pipeline_layout = unsafe {
             device.handle()
                 .create_pipeline_layout(&create_info, None)

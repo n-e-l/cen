@@ -62,8 +62,8 @@ pub struct WindowState<'a> {
 impl Renderer {
     pub fn new(window: &WindowState, proxy: EventLoopProxy<UserEvent>, vsync: bool) -> Renderer {
         let entry = ash::Entry::linked();
-        let instance = Instance::new(&entry, &window);
-        let surface = Surface::new(&entry, &instance, &window);
+        let instance = Instance::new(&entry, window);
+        let surface = Surface::new(&entry, &instance, window);
         let (physical_device, queue_family_index) = instance.create_physical_device(&entry, &surface);
         let device = Device::new(&instance, physical_device, queue_family_index);
         let queue = device.get_queue(0);
@@ -88,7 +88,7 @@ impl Renderer {
         };
 
         info!("Creating initial swapchain");
-        let swapchain = Swapchain::new(&instance, &physical_device, &device, &window, &surface, present_mode, None);
+        let swapchain = Swapchain::new(&instance, &physical_device, &device, window, &surface, present_mode, None);
 
         let command_buffers = (0..swapchain.get_image_count()).map(|_| {
             CommandBuffer::new(&device, &command_pool, true)
@@ -161,7 +161,7 @@ impl Renderer {
         );
         command_buffer.clear_color_image(swapchain_image, ImageLayout::TRANSFER_DST_OPTIMAL, [0.0, 0.0, 0.0, 1.0]);
         command_buffer.image_barrier(
-            &swapchain_image,
+            swapchain_image,
             ImageLayout::TRANSFER_DST_OPTIMAL,
             ImageLayout::PRESENT_SRC_KHR,
             vk::PipelineStageFlags::TRANSFER,
