@@ -1,22 +1,23 @@
 use winit::application::ApplicationHandler;
 use std::path::{PathBuf};
-use std::sync::{Arc, Mutex};
 use env_logger::{Builder, Env};
 use log::{LevelFilter};
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::window::WindowId;
+use crate::app::component::ComponentRegistry;
 use crate::app::engine::Engine;
-use crate::app::gui::GuiComponent;
-use crate::graphics::renderer::{RenderComponent};
 
+/**
+ * Entrypoint of a cen application.
+ * Listens to and passes eventloop events to the engine.
+ */
 pub struct App
 {
     pub proxy: EventLoopProxy<UserEvent>,
     pub app_config: AppConfig,
-    pub render_component: Option<Arc<Mutex<dyn RenderComponent>>>,
-    pub gui_component: Option<Arc<Mutex<dyn GuiComponent>>>,
     engine: Option<Engine>,
+    pub registry: Option<ComponentRegistry>,
 }
 
 pub struct AppConfig {
@@ -96,8 +97,7 @@ impl ApplicationHandler<UserEvent> for App
                 self.proxy.clone(),
                 event_loop,
                 &self.app_config,
-                self.render_component.take().unwrap(),
-                self.gui_component.take()
+                self.registry.take().unwrap()
             ));
         }
 
@@ -155,20 +155,19 @@ impl App {
             .init();
     }
     
-    fn new(app_config: AppConfig, event_loop: &EventLoop<UserEvent>, render_component: Arc<Mutex<dyn RenderComponent>>, gui_component: Option<Arc<Mutex<dyn GuiComponent>>>) -> Self {
+    fn new(app_config: AppConfig, event_loop: &EventLoop<UserEvent>, registry: ComponentRegistry) -> Self {
         
         let proxy = event_loop.create_proxy();
-        
+
         App {
             app_config,
             proxy,
-            render_component: Some(render_component),
-            gui_component,
+            registry: Some(registry),
             engine: None,
         }
     }
     
-    pub fn run(app_config: AppConfig, render_component: Arc<Mutex<dyn RenderComponent>>, gui_component: Option<Arc<Mutex<dyn GuiComponent>>>) {
+    pub fn run(app_config: AppConfig, registry: ComponentRegistry) {
 
         Self::init_logger();
 
@@ -176,7 +175,7 @@ impl App {
         event_loop.set_control_flow(ControlFlow::Poll);
 
         // App setup
-        let mut app = App::new(app_config, &event_loop, render_component, gui_component);
+        let mut app = App::new(app_config, &event_loop, registry);
         event_loop.run_app(&mut app).unwrap();
     }
 

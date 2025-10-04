@@ -4,6 +4,7 @@ use ash::vk;
 use ash::vk::WriteDescriptorSet;
 use cen::app::App;
 use cen::app::app::AppConfig;
+use cen::app::component::{Component, ComponentRegistry};
 use cen::graphics::Renderer;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{DescriptorSetLayout, Image};
@@ -183,13 +184,17 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
+    let compute = Arc::new(Mutex::new(ComputeRender {
+        image: None,
+        descriptorset: None,
+        pipeline: None,
+    }));
+
+    let registry = ComponentRegistry::new()
+        .register(Component::Render(compute));
+
     App::run(
         AppConfig::default(), 
-        Arc::new(Mutex::new(ComputeRender {
-            image: None,
-            descriptorset: None,
-            pipeline: None,
-        })),
-        None
+        registry
     );
 }

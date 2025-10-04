@@ -6,6 +6,7 @@ use egui::Context;
 use cen::app::App;
 use cen::app::app::AppConfig;
 use cen::app::gui::{GuiComponent, GuiSystem};
+use cen::app::component::{Component, ComponentRegistry};
 use cen::graphics::Renderer;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{DescriptorSetLayout, Image};
@@ -226,10 +227,14 @@ fn main() {
         pipeline_b: None,
         pressed: false,
     }));
+
+    let registry = ComponentRegistry::new()
+        .register(Component::Render(compute.clone()))
+        .register(Component::Gui(compute.clone()));
+
     App::run(
         AppConfig::default()
             .resizable(true),
-        compute.clone(),
-        Some(compute)
+        registry
     );
 }

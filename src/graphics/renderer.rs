@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use log::{info};
 use std::time::Instant;
 use ash::vk;
@@ -140,7 +141,7 @@ impl Renderer {
         self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
     }
 
-    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &mut [&mut dyn RenderComponent]) {
+    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &[Arc<Mutex<dyn RenderComponent>>]) {
 
         let mut command_buffer = self.command_buffers[frame_index].clone();
 
@@ -180,8 +181,8 @@ impl Renderer {
             on_finish: &mut self.on_finish_functions[frame_index]
         };
 
-        for rc in render_components.iter_mut() {
-            rc.render( &mut ctx );
+        for rc in render_components.iter() {
+            rc.lock().unwrap().render( &mut ctx );
         }
 
         command_buffer.end();
@@ -190,7 +191,7 @@ impl Renderer {
     pub fn update(&mut self) {
     }
 
-    pub fn draw_frame(&mut self, render_component: &mut [&mut dyn RenderComponent]) {
+    pub fn draw_frame(&mut self, render_components: &[Arc<Mutex<dyn RenderComponent>>]) {
 
         // Wait for the current frame's command buffer to finish executing.
         let fence = self.command_buffers[self.frame_index].fence();
@@ -204,7 +205,7 @@ impl Renderer {
         // Acquire image and signal the semaphore
         let image_index = self.swapchain.acquire_next_image(self.image_available_semaphores[self.frame_index]) as usize;
 
-        self.record_command_buffer(self.frame_index, image_index, render_component);
+        self.record_command_buffer(self.frame_index, image_index, render_components);
 
         self.device.reset_fence(fence);
         self.device.submit_command_buffer(
