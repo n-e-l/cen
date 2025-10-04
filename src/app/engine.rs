@@ -152,6 +152,7 @@ impl Engine {
 
         // Render all our components
         let mut draw_components = self.registry.render_components();
+        // Add our gui system to our render components
         draw_components.push(self.gui_system.clone());
         self.renderer.draw_frame(
             draw_components.as_slice()
