@@ -137,7 +137,7 @@ impl Instance {
             _marker: Default::default(),
         };
 
-        let debug_utils = debug_utils::Instance::new(&entry, &instance);
+        let debug_utils = debug_utils::Instance::new(entry, &instance);
         let debug_utils_messenger =
             unsafe { debug_utils.create_debug_utils_messenger(&debug_utils_create_info, None) }
                 .expect("Failed to create debug utils messenger");
@@ -159,7 +159,7 @@ impl Instance {
                 .enumerate_physical_devices()
                 .expect("Failed to enumerate physical devices.")
         };
-        let surface_loader = surface::Instance::new(&entry, &self.handle());
+        let surface_loader = surface::Instance::new(entry, self.handle());
         let (physical_device, queue_family_index) = physical_devices
             .iter()
             .find_map(|physical_device| {

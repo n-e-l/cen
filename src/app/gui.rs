@@ -9,6 +9,7 @@ use crate::graphics::Renderer;
 use crate::graphics::renderer::{RenderComponent, RenderContext};
 use crate::vulkan::{Device, DescriptorPool, Image};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use log::{error, trace};
 
 pub trait GuiComponent {
@@ -103,13 +104,13 @@ impl GuiSystem {
         let _ = self.egui_winit.on_window_event(window, event);
     }
     
-    pub fn update(&mut self, window: &winit::window::Window, components: &mut [&mut dyn GuiComponent]) {
+    pub fn update(&mut self, window: &winit::window::Window, components: &mut [Arc<Mutex<dyn GuiComponent>>]) {
 
         // Renew gui
         let raw_input = self.egui_winit.take_egui_input(window);
         self.egui_output = Some(self.egui_ctx.run(raw_input, |ctx| {
             for component in &mut *components {
-                component.gui(&self, ctx);
+                component.lock().unwrap().gui(self, ctx);
             }
         }));
     }

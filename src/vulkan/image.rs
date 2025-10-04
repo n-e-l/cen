@@ -130,8 +130,8 @@ impl Image {
         // Image
         let create_info = vk::ImageCreateInfo::default()
             .extent(vk::Extent3D {
-                width: width,
-                height: height,
+                width,
+                height,
                 depth: 1,
             })
             .samples(vk::SampleCountFlags::TYPE_1)

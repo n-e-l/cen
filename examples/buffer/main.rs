@@ -1,9 +1,10 @@
 use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::{BufferImageCopy, BufferUsageFlags, Extent3D, ImageLayout, ImageSubresourceLayers};
+use ash::vk::{BufferImageCopy, BufferUsageFlags, DeviceSize, Extent3D, ImageLayout, ImageSubresourceLayers};
 use gpu_allocator::MemoryLocation;
 use cen::app::App;
 use cen::app::app::AppConfig;
+use cen::app::component::{Component, ComponentRegistry};
 use cen::graphics::Renderer;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{Buffer};
@@ -35,6 +36,26 @@ impl RenderComponent for ComputeRender {
 
     fn render(&mut self, ctx: &mut RenderContext) {
 
+        if self.buffer.as_ref().unwrap().size() != (ctx.swapchain_image.width() * ctx.swapchain_image.height() * 4) as u64 {
+            // Recreate image
+            let buffer = Buffer::new(
+                &ctx.device,
+                &mut ctx.allocator,
+                MemoryLocation::CpuToGpu,
+                (ctx.swapchain_image.width() * ctx.swapchain_image.height() * 4) as DeviceSize,
+                BufferUsageFlags::TRANSFER_SRC
+            );
+
+            {
+                let mut mem = buffer.mapped().unwrap();
+                for i in mem.as_mut_slice() {
+                    *i = 255u8;
+                }
+            }
+
+            self.buffer = Some(buffer);
+        }
+
         // Transition the swapchain image
         ctx.command_buffer.image_barrier(
             ctx.swapchain_image,
@@ -59,13 +80,13 @@ impl RenderComponent for ComputeRender {
             ImageLayout::TRANSFER_DST_OPTIMAL,
             &[
                 BufferImageCopy::default()
-                    .buffer_image_height(2000)
-                    .buffer_row_length(2000)
+                    .buffer_image_height(0)
+                    .buffer_row_length(0)
                     .buffer_offset(0)
                     .image_extent(
                         Extent3D::default()
-                            .width(2000)
-                            .height(2000)
+                            .width(ctx.swapchain_image.width())
+                            .height(ctx.swapchain_image.height())
                             .depth(1)
                     )
                     .image_subresource(
@@ -93,12 +114,16 @@ impl RenderComponent for ComputeRender {
 }
 
 fn main() {
+    let compute = Arc::new(Mutex::new(ComputeRender {
+        buffer: None
+    }));
+
+    let registry = ComponentRegistry::new()
+        .register(Component::Render(compute));
+
     App::run(
         AppConfig::default(),
-         Arc::new(Mutex::new(ComputeRender {
-            buffer: None
-        })),
-        None
+        registry
     );
 }
 

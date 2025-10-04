@@ -54,7 +54,7 @@ pub fn load_shader_code(source_file: PathBuf, macros: &HashMap<String, String>) 
         _ => panic!("Unknown shader type")
     };
 
-    let source = fs::read_to_string(source_file.clone()).expect(format!("Failed to read file: {:?}", source_file).as_str());
+    let source = fs::read_to_string(source_file.clone()).unwrap_or_else(|_| panic!("Failed to read file: {:?}", source_file));
 
     let compiler = shaderc::Compiler::new().unwrap();
     let mut options = shaderc::CompileOptions::new().unwrap();
