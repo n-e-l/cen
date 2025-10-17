@@ -23,7 +23,7 @@ impl ComputeRender {
     fn new(ctx: &mut InitContext) -> Self {
 
         // Image
-        let image = Image::new(
+        let image = Image::new_rgba(
             &ctx.device,
             &mut ctx.allocator,
             ctx.swapchain_extent.width,
@@ -79,7 +79,7 @@ impl RenderComponent for ComputeRender {
 
         if self.image.width() != ctx.swapchain_image.width() || self.image.height() != ctx.swapchain_image.height() {
             // Recreate image
-            self.image = Image::new(
+            self.image = Image::new_rgba(
                 &ctx.device,
                 &mut ctx.allocator,
                 ctx.swapchain_image.width(),

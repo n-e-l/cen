@@ -61,7 +61,7 @@ impl CommandBuffer {
         }
     }
 
-    fn track(&mut self, resource: &dyn GpuResource ) {
+    pub fn track(&mut self, resource: &dyn GpuResource ) {
         let mut lock = self.inner.resource_handles.lock().expect("Failed to lock mutex");
         lock.push(resource.reference());
     }
@@ -159,6 +159,20 @@ impl CommandBuffer {
                 &[],
                 &[image_memory_barrier]
             )
+        }
+    }
+
+    pub fn push_descriptor_set(&mut self, pipeline: &dyn Pipeline, set: u32, write_descriptor_sets: &[WriteDescriptorSet]) {
+        self.track(pipeline.resource());
+
+        unsafe {
+            self.inner.device_dep.device_push_descriptor.cmd_push_descriptor_set(
+                self.inner.command_buffer,
+                pipeline.bind_point(),
+                pipeline.layout(),
+                set,
+                write_descriptor_sets
+            );
         }
     }
 
