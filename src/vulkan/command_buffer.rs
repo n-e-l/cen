@@ -275,6 +275,30 @@ impl CommandBuffer {
         }
     }
 
+    pub fn clear_color_image_u32<'a>(&mut self, image: &Image, layout: ImageLayout, color: [u32; 4])
+    {
+        self.track(image);
+
+        unsafe {
+            let mut clear_color_value = vk::ClearColorValue::default();
+            clear_color_value.uint32 = color;
+            let sub_resource_ranges = [ vk::ImageSubresourceRange::default()
+                .aspect_mask(vk::ImageAspectFlags::COLOR)
+                .base_array_layer(0)
+                .base_mip_level(0)
+                .layer_count(1)
+                .level_count(1) ];
+            self.inner.device_dep.device
+                .cmd_clear_color_image(
+                    self.inner.command_buffer,
+                    *image.handle(),
+                    layout,
+                    &clear_color_value,
+                    &sub_resource_ranges
+                )
+        }
+    }
+
     pub fn clear_color_image<'a>(&mut self, image: &Image, layout: ImageLayout, color: [f32; 4])
     {
         self.track(image);
