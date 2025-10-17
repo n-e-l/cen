@@ -114,7 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Remove kiyo specific code
 
-## [0.0.4](https://github.com/angelocarly/kiyo/compare/v0.0.3...v0.0.4) - 2024-08-17
+## [0.0.2](https://github.com/angelocarly/kiyo/compare/v0.0.1...v0.0.2) - 2024-08-17
 
 ### Other
 - Add a little bit of documentation
@@ -128,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calculate and pass the macros into the shader compilation
 - Pass compute image count through code
 
-## [0.0.3](https://github.com/angelocarly/kiyo/compare/v0.0.2...v0.0.3) - 2024-08-14
+## [0.0.1](https://github.com/angelocarly/kiyo/compare/v0.0.0...v0.0.1) - 2024-08-14
 
 ### Other
 - Create release.yml
