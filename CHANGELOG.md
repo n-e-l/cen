@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.9](https://github.com/n-e-l/cen/compare/v0.0.8...v0.0.9) - 2025-10-17
+
+### Other
+
+- Don't build shaderc from source
+- Add clear_color_image_u32
+- Add imagebuilder
+- Ignore .envrc
+- Add comments
+- Remove initialization calls
+- Merge pull request #20 from n-e-l/release-plz-2025-09-08T13-30-55Z
+- Add documentation
+- Remove empty update
+- Expose dependencies
+- Fix buffer test
+- Simplify
+- Run clippy
+- Introduce component registry
+
 ## [0.0.8](https://github.com/n-e-l/cen/compare/v0.0.7...v0.0.8) - 2025-09-28
 
 ### Other
