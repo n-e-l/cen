@@ -14,50 +14,53 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
+        rustToolchain = pkgs.rust-bin.stable."1.90.0".default.override {
+          extensions = [ "rust-src" "clippy" "rustfmt" ];
+        };
       in
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # Rust toolchain
-            rust-bin.stable.latest.default
+            rustToolchain
             
             # Development tools
             rust-analyzer
             cargo-watch
             cargo-edit
 
-	    # GPU
-	    vulkan-loader
-	    vulkan-headers
-	    vulkan-tools
-	    vulkan-validation-layers
-	    glslang
-	    spirv-tools
+			# GPU
+			vulkan-loader
+			vulkan-headers
+			vulkan-tools
+			vulkan-validation-layers
+			glslang
+			spirv-tools
+			shaderc
 
-	    # Wayland
-	    wayland
-	    wayland-protocols
+			# Wayland
+			wayland
+			wayland-protocols
             libxkbcommon
-            
-	    # For building shaderc
-	    cmake
-	    python3
           ];
 
-	  # Set library paths
+          # Set library paths
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
             pkgs.wayland
             pkgs.libxkbcommon
             pkgs.vulkan-loader
+            pkgs.shaderc
           ];
 
-	  shellHook = ''
-            export VK_LAYER_PATH="${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d"
-            export LD_LIBRARY_PATH="${pkgs.wayland}/lib:${pkgs.libxkbcommon}/lib:${pkgs.vulkan-loader}/lib:$LD_LIBRARY_PATH"
+		  shellHook = ''
+				export VK_LAYER_PATH="${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d"
+				export LD_LIBRARY_PATH="${pkgs.wayland}/lib:${pkgs.libxkbcommon}/lib:${pkgs.vulkan-loader}/lib:$LD_LIBRARY_PATH"
+                export SHADERC_LIB_DIR="${pkgs.shaderc.lib}/lib"
           '';
 
           # Environment variables
-          RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
+          RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
+
         };
       });
 }

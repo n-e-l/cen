@@ -4,7 +4,7 @@ use ash::vk;
 use ash::vk::WriteDescriptorSet;
 use egui::Context;
 use cen::app::app::{AppConfig, Cen};
-use cen::app::gui::{GuiComponent, GuiSystem};
+use cen::app::gui::{GuiComponent, GuiHandler};
 use cen::app::component::{Component, ComponentRegistry};
 use cen::app::engine::InitContext;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
@@ -211,7 +211,7 @@ impl RenderComponent for ComputeRender {
 }
 
 impl GuiComponent for ComputeRender {
-    fn gui(&mut self, _: &GuiSystem, ctx: &Context) {
+    fn gui(&mut self, _: &mut GuiHandler, ctx: &Context) {
         egui::Window::new("Shader controls")
             .resizable(true)
             .title_bar(true)

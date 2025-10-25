@@ -11,9 +11,11 @@ use crate::vulkan::{Device, DescriptorPool, Image};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use log::{error, trace};
+use crate::vulkan::memory::GpuResource;
+use std::any::Any;
 
 pub trait GuiComponent {
-    fn gui(&mut self, gui: &GuiSystem, context: &Context);
+    fn gui(&mut self, gui: &mut GuiHandler, context: &Context);
 }
 
 pub struct GuiSystem {
@@ -24,7 +26,7 @@ pub struct GuiSystem {
     renderer_descriptor_pool: DescriptorPool,
     egui_output: Option<FullOutput>,
     texture_layout: DescriptorSetLayout,
-    user_textures: HashMap<TextureId, DescriptorSet>,
+    user_textures: HashMap<TextureId, (DescriptorSet, Arc<dyn Any>)>,
 }
 
 impl Drop for GuiSystem {
@@ -37,6 +39,42 @@ impl Drop for GuiSystem {
             self.device.handle().destroy_descriptor_set_layout(self.texture_layout, None);
             trace!("Destroyed gui image descriptor set layout {:?}", self.texture_layout);
         }
+    }
+}
+
+pub struct GuiHandler<'a>
+{
+    device: &'a Device,
+    texture_layout: &'a DescriptorSetLayout,
+    renderer_descriptor_pool: &'a DescriptorPool,
+    egui_renderer: &'a mut egui_ash_renderer::Renderer,
+    user_textures: &'a mut HashMap<TextureId, (DescriptorSet, Arc<dyn Any>)>,
+}
+impl GuiHandler<'_>
+{
+    pub fn create_texture(&mut self, image: &Image) -> TextureId {
+        let device = self.device.handle();
+        let descriptor_set = create_vulkan_descriptor_set(
+            device,
+            *self.texture_layout,
+            self.renderer_descriptor_pool.handle(),
+            image.image_view(),
+            image.sampler(),
+        ).unwrap();
+
+        let texture_id = self.egui_renderer.add_user_texture(descriptor_set);
+
+        self.user_textures.insert(texture_id, (descriptor_set, image.reference()));
+
+        texture_id
+    }
+
+    pub fn remove_texture(&mut self, texture_id: TextureId) {
+        unsafe {
+            let set = self.user_textures.remove(&texture_id).unwrap();
+            self.device.handle().free_descriptor_sets(self.renderer_descriptor_pool.descriptor_pool, &[set.0]).unwrap();
+        }
+        self.egui_renderer.remove_user_texture(texture_id);
     }
 }
 
@@ -100,42 +138,26 @@ impl GuiSystem {
         }
     }
 
-    pub fn create_texture(&mut self, image: &Image) -> TextureId {
-        let device = self.device.handle();
-        let descriptor_set = create_vulkan_descriptor_set(
-            device,
-            self.texture_layout,
-            self.renderer_descriptor_pool.handle(),
-            image.image_view(),
-            image.sampler(),
-        ).unwrap();
-
-        let texture_id = self.egui_renderer.add_user_texture(descriptor_set);
-
-        self.user_textures.insert(texture_id, descriptor_set);
-
-        texture_id
-    }
-
-    pub fn remove_texture(&mut self, texture_id: TextureId) {
-        unsafe {
-            let set = self.user_textures.remove(&texture_id).unwrap();
-            self.device.handle().free_descriptor_sets(self.renderer_descriptor_pool.descriptor_pool, &[set]).unwrap();
-        }
-        self.egui_renderer.remove_user_texture(texture_id);
-    }
-
     pub fn on_window_event(&mut self, window: &winit::window::Window, event: &winit::event::WindowEvent) {
         let _ = self.egui_winit.on_window_event(window, event);
     }
 
     pub fn update(&mut self, window: &winit::window::Window, components: &mut [Arc<Mutex<dyn GuiComponent>>]) {
 
+        let mut handler = GuiHandler
+        {
+            device: &self.device,
+            texture_layout: &self.texture_layout,
+            renderer_descriptor_pool: &self.renderer_descriptor_pool,
+            egui_renderer: &mut self.egui_renderer,
+            user_textures: &mut self.user_textures,
+        };
+
         // Renew gui
         let raw_input = self.egui_winit.take_egui_input(window);
         self.egui_output = Some(self.egui_ctx.run(raw_input, |ctx| {
             for component in &mut *components {
-                component.lock().unwrap().gui(self, ctx);
+                component.lock().unwrap().gui(&mut handler, ctx);
             }
         }));
     }

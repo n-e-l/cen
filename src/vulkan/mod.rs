@@ -13,7 +13,7 @@ mod image;
 mod descriptor_set_layout;
 mod allocator;
 mod buffer;
-mod memory;
+pub(crate) mod memory;
 mod descriptor_pool;
 
 pub(crate) const LOG_TARGET: &str = "cen::vulkan";
