@@ -3,7 +3,8 @@ use std::{fmt, fs};
 use std::path::PathBuf;
 use ash::vk;
 use ash::vk::ShaderModule;
-use log::{trace};
+use log::{info, trace};
+use shaderc::{IncludeType, ResolvedInclude};
 use crate::vulkan::{LOG_TARGET};
 use crate::vulkan::memory::GpuResource;
 
@@ -58,6 +59,25 @@ pub fn load_shader_code(source_file: PathBuf, macros: &HashMap<String, String>) 
 
     let compiler = shaderc::Compiler::new().unwrap();
     let mut options = shaderc::CompileOptions::new().unwrap();
+    options.set_include_callback(|include_name, include_type, original_source, _| {
+        let original_path = PathBuf::from(original_source);
+
+        match include_type {
+            IncludeType::Relative => {
+                let path = original_path.parent().unwrap().join(PathBuf::from(include_name));
+                let source = fs::read_to_string(path.clone()).unwrap_or_else(|_| panic!("Failed to read file: {:?}", path));
+                info!("Loaded shader include: {}", path.to_str().unwrap());
+                Ok(ResolvedInclude {
+                    resolved_name: path.to_str().unwrap().to_string(),
+                    content: source,
+                })
+            }
+            IncludeType::Standard => {
+                Err(format!("Only relative includes are supported. Can't include {}", include_name))
+            }
+        }
+
+    });
     options.add_macro_definition("EP", Some("main"));
     for ( k, v ) in macros {
         options.add_macro_definition(k, Some(v.to_string().as_str()));
