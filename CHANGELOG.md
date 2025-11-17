@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.11](https://github.com/n-e-l/cen/compare/v0.0.10...v0.0.11) - 2025-11-17
+
+### Other
+
+- Add support for shader includes
+- Update egui to 0.32.2
+- Merge pull request #24 from n-e-l/release-plz-2025-10-17T20-19-07Z
+- Add guihandler and fix shaderc flake
+
 ## [0.0.10](https://github.com/n-e-l/cen/compare/v0.0.9...v0.0.10) - 2025-10-17
 
 ### Other
