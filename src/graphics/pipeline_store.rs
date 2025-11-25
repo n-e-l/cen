@@ -72,6 +72,27 @@ impl PipelineStore {
         }
     }
 
+    pub fn update(&mut self, key: PipelineKey, config: PipelineConfig) -> Result<PipelineKey, PipelineErr> {
+        let mut inner = self.inner.lock().unwrap();
+
+        // Watch for file changes
+        inner.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
+
+        let pipeline = ComputePipeline::new(
+            &inner.device,
+            config.shader_path.clone(),
+            config.descriptor_set_layouts.as_slice(),
+            config.push_constant_ranges.as_slice(),
+            &config.macros
+        )?;
+
+        let handle = inner.pipelines.get_mut(key).expect("Key not found");
+        handle.config = config;
+        handle.pipeline = pipeline;
+
+        Ok(key)
+    }
+
     pub fn insert(&mut self, config: PipelineConfig) -> Result<PipelineKey, PipelineErr> {
         let mut inner = self.inner.lock().unwrap();
 

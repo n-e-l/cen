@@ -13,7 +13,7 @@ use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, Instan
 pub struct RenderContext<'a> {
     pub device: &'a Device,
     pub allocator: &'a mut Allocator,
-    pub pipeline_store: &'a PipelineStore,
+    pub pipeline_store: &'a mut PipelineStore,
     pub command_buffer: &'a mut CommandBuffer,
     pub swapchain_image: &'a Image,
     pub queue: &'a Queue,
@@ -172,7 +172,7 @@ impl Renderer {
         let mut ctx = RenderContext {
             device: &self.device,
             allocator: &mut self.allocator,
-            pipeline_store: &self.pipeline_store,
+            pipeline_store: &mut self.pipeline_store,
             command_buffer: &mut command_buffer,
             swapchain_image,
             queue: &self.queue,
