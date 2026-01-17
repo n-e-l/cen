@@ -145,6 +145,7 @@ impl Cen {
             .format_level(true)
             .format_timestamp_millis()
             .filter(Some("winit"), LevelFilter::Error)
+            .filter(Some("tracing::span"), LevelFilter::Error)
             .filter(Some("calloop"), LevelFilter::Error)
             .filter(Some("notify::inotify"), LevelFilter::Error)
             .filter(Some("mio::poll"), LevelFilter::Error)
