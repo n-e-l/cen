@@ -8,7 +8,7 @@ use cen::app::component::{Component, ComponentRegistry};
 use cen::app::engine::InitContext;
 use cen::graphics::DynamicImage;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
-use cen::vulkan::{DescriptorSetLayout, Image, ImageConfig, OwnedImage};
+use cen::vulkan::{DescriptorSetLayout, Image, ImageConfig};
 
 #[allow(dead_code)]
 struct ComputeRender {

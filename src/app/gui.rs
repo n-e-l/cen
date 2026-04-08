@@ -11,7 +11,6 @@ use crate::vulkan::{Device, DescriptorPool, Image};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use log::{error, trace};
-use crate::vulkan::memory::GpuResource;
 use std::any::Any;
 
 pub trait GuiComponent {
