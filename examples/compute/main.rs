@@ -183,7 +183,7 @@ impl RenderComponent for ComputeRender {
 
 fn main() {
     Cen::run(
-        AppConfig::default(), 
+        AppConfig::default(),
         Box::new(|ctx| {
             let compute = Arc::new(Mutex::new(ComputeRender::new(ctx)));
             ComponentRegistry::new()

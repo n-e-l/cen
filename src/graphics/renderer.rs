@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 use log::{info};
 use std::time::Instant;
 use ash::vk;
@@ -7,10 +7,9 @@ use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
 use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
-use crate::graphics::dynamic_image::DynamicImage;
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::graphics::WeakDynamicImage;
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, Instance, Surface, Swapchain, SwapchainImage};
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain, SwapchainImage};
 
 pub struct RenderContext<'a> {
     pub device: &'a Device,

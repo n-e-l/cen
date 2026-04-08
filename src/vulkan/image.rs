@@ -102,7 +102,9 @@ pub trait Image: GpuResource {
     fn sampler(&self) -> vk::Sampler;
     fn width(&self) -> u32;
     fn height(&self) -> u32;
-    fn extent(&self) -> Extent2D;
+    fn extent(&self) -> Extent2D {
+        Extent2D { width: self.width(), height: self.height() }
+    }
     fn binding(&self, layout: vk::ImageLayout) -> vk::DescriptorImageInfo;
 }
 
@@ -117,13 +119,11 @@ struct OwnedImageInner {
 }
 
 struct SwapchainImageInner {
-    pub device_dep: Arc<DeviceInner>,
-    pub allocator_dep: Option<Arc<Mutex<AllocatorInner>>>,
-    pub(crate) image: vk::Image,
-    pub(crate) image_view: vk::ImageView,
-    pub(crate) sampler: vk::Sampler,
-    pub allocation: Mutex<Option<Allocation>>,
-    pub extent: vk::Extent2D,
+    device_dep: Arc<DeviceInner>,
+    image: vk::Image,
+    image_view: vk::ImageView,
+    sampler: vk::Sampler,
+    extent: vk::Extent2D,
 }
 
 pub struct OwnedImage {
@@ -137,18 +137,9 @@ pub struct SwapchainImage {
 impl Drop for SwapchainImageInner {
     fn drop(&mut self) {
         unsafe {
-            let image_addr = format!("{:?}", self.image);
             self.device_dep.device.destroy_sampler(self.sampler, None);
             self.device_dep.device.destroy_image_view(self.image_view, None);
-
-            if let Some(allocation) = self.allocation.lock().unwrap().take() {
-                let memory_addr = format!("{:?}, {:?}", allocation.memory(), allocation.chunk_id());
-                self.allocator_dep.as_ref().expect("").lock().unwrap().allocator.lock().unwrap().free(allocation).unwrap();
-                trace!(target: LOG_TARGET, "Destroyed image memory: [{}]", memory_addr);
-            }
-
-            // Don't destroy the image, it's external
-            trace!(target: LOG_TARGET, "Destroyed external image data: [{}]", image_addr);
+            trace!(target: LOG_TARGET, "Destroyed external image data: [{:?}]", self.image);
         }
     }
 }
@@ -211,14 +202,11 @@ impl SwapchainImage {
 
         let image_view = unsafe {
             device.handle().create_image_view(&image_view_create_info, None)
-                .expect("Failed to create image")
+                .expect("Failed to create image view")
         };
 
-        let sampler_create_info = vk::SamplerCreateInfo::default();
-
-        // Sampler
         let sampler = unsafe {
-            device.handle().create_sampler(&sampler_create_info, None)
+            device.handle().create_sampler(&vk::SamplerCreateInfo::default(), None)
                 .expect("Failed to create sampler")
         };
 
@@ -227,9 +215,7 @@ impl SwapchainImage {
                 image,
                 image_view,
                 sampler,
-                allocation: Mutex::new(None),
                 device_dep: device.inner.clone(),
-                allocator_dep: None,
                 extent,
             })
         }
@@ -246,7 +232,7 @@ impl OwnedImage {
             .samples(config.samples)
             .usage(config.image_usage_flags)
             .sharing_mode(config.sharing_mode)
-            .initial_layout(config.initial_layout )
+            .initial_layout(config.initial_layout)
             .array_layers(config.array_layers)
             .mip_levels(config.mip_levels)
             .image_type(config.image_type)
@@ -343,10 +329,6 @@ impl Image for OwnedImage {
         self.inner.config.extent.height
     }
 
-    fn extent(&self) -> Extent2D {
-        Extent2D { width: self.width(), height: self.height() }
-    }
-
     fn binding(&self, layout: vk::ImageLayout) -> vk::DescriptorImageInfo {
         vk::DescriptorImageInfo::default()
             .image_layout(layout)
@@ -376,10 +358,6 @@ impl Image for SwapchainImage {
         self.inner.extent.height
     }
 
-    fn extent(&self) -> Extent2D {
-        Extent2D { width: self.width(), height: self.height() }
-    }
-
     fn binding(&self, layout: ImageLayout) -> DescriptorImageInfo {
         vk::DescriptorImageInfo::default()
             .image_layout(layout)
@@ -387,4 +365,3 @@ impl Image for SwapchainImage {
             .sampler(self.inner.sampler)
     }
 }
-

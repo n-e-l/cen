@@ -1,48 +1,31 @@
 use std::any::Any;
 use std::sync::{Arc, Mutex, Weak};
 use ash::vk;
-use ash::vk::{DescriptorImageInfo, Extent2D, ImageLayout, ImageView, Sampler};
+use ash::vk::{DescriptorImageInfo, ImageLayout, ImageView, Sampler};
 use crate::vulkan::{Image, ImageConfig, OwnedImage};
 use crate::vulkan::Device;
 use crate::vulkan::Allocator;
 use crate::vulkan::memory::GpuResource;
-
-struct InnerDynamicImage {
-    image: OwnedImage
-}
-
-impl InnerDynamicImage {
-    pub fn resize(&mut self, device: &Device, allocator: &mut Allocator, width: u32, height: u32) {
-        self.image = OwnedImage::new(
-            device,
-            allocator,
-            self.image.config()
-                .width(width)
-                .height(height)
-        )
-    }
-}
-
 
 /*
  * A wrapper around an image which may be resized.
  */
 #[derive(Clone)]
 pub struct DynamicImage {
-    inner: Arc<Mutex<InnerDynamicImage>>
+    inner: Arc<Mutex<OwnedImage>>
 }
 
 impl DynamicImage {
     pub fn new(device: &Device, allocator: &mut Allocator, config: ImageConfig) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(InnerDynamicImage {
-                image: OwnedImage::new(device, allocator, config)
-            }))
+            inner: Arc::new(Mutex::new(OwnedImage::new(device, allocator, config)))
         }
     }
 
     pub fn resize(&mut self, device: &Device, allocator: &mut Allocator, width: u32, height: u32) {
-        self.inner.lock().unwrap().resize(device, allocator, width, height);
+        let mut lock = self.inner.lock().unwrap();
+        let config = lock.config().width(width).height(height);
+        *lock = OwnedImage::new(device, allocator, config);
     }
 
     pub fn weak(&self) -> WeakDynamicImage {
@@ -54,7 +37,7 @@ impl DynamicImage {
 
 #[derive(Clone)]
 pub struct WeakDynamicImage {
-    inner: Weak<Mutex<InnerDynamicImage>>
+    inner: Weak<Mutex<OwnedImage>>
 }
 
 impl WeakDynamicImage {
@@ -67,40 +50,36 @@ impl WeakDynamicImage {
 
 impl GpuResource for DynamicImage {
     fn reference(&self) -> Arc<dyn Any> {
-        self.inner.lock().unwrap().image.reference()
+        self.inner.lock().unwrap().reference()
     }
 }
 
 impl Image for DynamicImage {
-    fn handle(&self) -> ash::vk::Image {
-        self.inner.lock().unwrap().image.handle()
+    fn handle(&self) -> vk::Image {
+        self.inner.lock().unwrap().handle()
     }
 
     fn image_view(&self) -> ImageView {
-        self.inner.lock().unwrap().image.image_view()
+        self.inner.lock().unwrap().image_view()
     }
 
     fn sampler(&self) -> Sampler {
-        self.inner.lock().unwrap().image.sampler()
+        self.inner.lock().unwrap().sampler()
     }
 
     fn width(&self) -> u32 {
-        self.inner.lock().unwrap().image.width()
+        self.inner.lock().unwrap().width()
     }
 
     fn height(&self) -> u32 {
-        self.inner.lock().unwrap().image.height()
-    }
-
-    fn extent(&self) -> Extent2D {
-        self.inner.lock().unwrap().image.extent()
+        self.inner.lock().unwrap().height()
     }
 
     fn binding(&self, layout: ImageLayout) -> DescriptorImageInfo {
         let lock = self.inner.lock().unwrap();
         vk::DescriptorImageInfo::default()
             .image_layout(layout)
-            .image_view(lock.image.image_view())
-            .sampler(lock.image.sampler())
+            .image_view(lock.image_view())
+            .sampler(lock.sampler())
     }
 }
