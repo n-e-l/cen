@@ -24,6 +24,12 @@ pub struct Allocator {
     pub(crate) inner: Arc<Mutex<AllocatorInner>>,
 }
 
+impl Clone for Allocator {
+    fn clone(&self) -> Self {
+        Allocator { inner: self.inner.clone() }
+    }
+}
+
 impl Allocator {
     pub fn new(device: &Device, desc: &AllocatorCreateDesc) -> Self {
         let allocator = Arc::new( Mutex::new(AllocatorInner {

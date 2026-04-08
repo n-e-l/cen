@@ -52,7 +52,7 @@ pub struct GuiHandler<'a>
 }
 impl GuiHandler<'_>
 {
-    pub fn create_texture(&mut self, image: &Image) -> TextureId {
+    pub fn create_texture(&mut self, image: &impl Image) -> TextureId {
         let device = self.device.handle();
         let descriptor_set = create_vulkan_descriptor_set(
             device,
@@ -202,7 +202,7 @@ impl RenderComponent for GuiSystem {
             // Egui draw call
             match self.egui_renderer.cmd_draw(
                 ctx.command_buffer.handle(),
-                ctx.swapchain_image.extent(),
+                vk::Extent2D { width: ctx.swapchain_image.width(), height: ctx.swapchain_image.height() },
                 output.pixels_per_point,
                 clipped_primitives.as_slice()
             ) {

@@ -1,21 +1,23 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 use log::{info};
 use std::time::Instant;
 use ash::vk;
-use ash::vk::{Extent2D, ImageLayout, PhysicalDevice, Queue};
+use ash::vk::{Extent2D, ImageLayout, PhysicalDevice, Queue, SwapchainImageCreateInfoANDROID};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
 use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
+use crate::graphics::dynamic_image::DynamicImage;
 use crate::graphics::pipeline_store::PipelineStore;
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, Instance, Surface, Swapchain};
+use crate::graphics::WeakDynamicImage;
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, Instance, OwnedImage, Surface, Swapchain, SwapchainImage};
 
 pub struct RenderContext<'a> {
     pub device: &'a Device,
     pub allocator: &'a mut Allocator,
     pub pipeline_store: &'a mut PipelineStore,
     pub command_buffer: &'a mut CommandBuffer,
-    pub swapchain_image: &'a Image,
+    pub swapchain_image: &'a SwapchainImage,
     pub queue: &'a Queue,
     pub command_pool: &'a CommandPool,
     on_finish: &'a mut Vec<Box<dyn FnOnce()>>
@@ -32,6 +34,7 @@ pub trait RenderComponent {
 }
 
 pub struct Renderer {
+    resizable_images: Vec<WeakDynamicImage>,
     pub(crate) pipeline_store: PipelineStore,
     pub render_finished_semaphores: Vec<vk::Semaphore>,
     pub image_available_semaphores: Vec<vk::Semaphore>,
@@ -131,13 +134,33 @@ impl Renderer {
             frame_index: 0,
             start_time,
             present_mode,
+            resizable_images: Vec::new()
         }
     }
 
-    pub(crate) fn recreate_window(&mut self, window_state: WindowState) {
-        info!("Recreating swapchain");
+    pub fn register_dynamic_image(&mut self, dynamic_image: &WeakDynamicImage) {
+        self.resizable_images.push(dynamic_image.clone());
+    }
+
+    pub(crate) fn on_window_recreation(&mut self, window_state: WindowState) {
         self.device.wait_idle();
+        info!("Recreating swapchain");
         self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
+
+        // Update all subscribed images with the new resolution
+        let mut update_count = 0;
+        self.resizable_images.retain_mut(|weak| {
+           match weak.upgrade() {
+               Some(mut image) => {
+                   update_count += 1;
+                   image.resize( &self.device, &mut self.allocator, window_state.extent2d.width, window_state.extent2d.height);
+                   true
+               }
+               None => false
+           }
+        });
+
+        info!("Recreated {update_count} images with resolution {} {}", window_state.extent2d.width, window_state.extent2d.height);
     }
 
     fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &[Arc<Mutex<dyn RenderComponent>>]) {
