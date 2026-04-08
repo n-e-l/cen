@@ -91,7 +91,6 @@ impl Engine {
         command_buffer.end();
         renderer.submit_single_time_command_buffer(command_buffer);
 
-
         Engine {
             _start_time: SystemTime::now(),
             window,

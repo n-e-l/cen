@@ -1,11 +1,11 @@
 use std::any::Any;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::{ComponentMapping, DescriptorImageInfo, Extent2D, Extent3D, Format, ImageAspectFlags, ImageLayout, ImageUsageFlags, ImageView, Sampler, SharingMode};
+use ash::vk::{ComponentMapping, DescriptorImageInfo, Extent2D, ImageAspectFlags, ImageLayout, ImageView, Sampler};
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
 use log::{trace};
-use crate::vulkan::{Allocator, CommandBuffer, Device, LOG_TARGET};
+use crate::vulkan::{Allocator, Device, LOG_TARGET};
 use crate::vulkan::allocator::AllocatorInner;
 use crate::vulkan::device::DeviceInner;
 use crate::vulkan::memory::GpuResource;
@@ -230,7 +230,7 @@ impl SwapchainImage {
                 allocation: Mutex::new(None),
                 device_dep: device.inner.clone(),
                 allocator_dep: None,
-                extent: extent,
+                extent,
             })
         }
     }
@@ -346,7 +346,6 @@ impl Image for OwnedImage {
     fn extent(&self) -> Extent2D {
         Extent2D { width: self.width(), height: self.height() }
     }
-
 
     fn binding(&self, layout: vk::ImageLayout) -> vk::DescriptorImageInfo {
         vk::DescriptorImageInfo::default()
