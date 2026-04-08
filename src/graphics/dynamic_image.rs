@@ -2,9 +2,7 @@ use std::any::Any;
 use std::sync::{Arc, Mutex, Weak};
 use ash::vk;
 use ash::vk::{DescriptorImageInfo, ImageLayout, ImageView, Sampler};
-use crate::vulkan::{Image, ImageConfig, OwnedImage};
-use crate::vulkan::Device;
-use crate::vulkan::Allocator;
+use crate::vulkan::{Allocator, Device, Image, ImageConfig, OwnedImage};
 use crate::vulkan::memory::GpuResource;
 
 /*
@@ -13,6 +11,11 @@ use crate::vulkan::memory::GpuResource;
 #[derive(Clone)]
 pub struct DynamicImage {
     inner: Arc<Mutex<OwnedImage>>
+}
+
+#[derive(Clone)]
+pub struct WeakDynamicImage {
+    inner: Weak<Mutex<OwnedImage>>
 }
 
 impl DynamicImage {
@@ -33,11 +36,6 @@ impl DynamicImage {
             inner: Arc::downgrade(&self.inner)
         }
     }
-}
-
-#[derive(Clone)]
-pub struct WeakDynamicImage {
-    inner: Weak<Mutex<OwnedImage>>
 }
 
 impl WeakDynamicImage {
