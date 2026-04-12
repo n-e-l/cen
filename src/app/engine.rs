@@ -139,7 +139,7 @@ impl Engine {
                 };
                 self.renderer.on_window_recreation(window_state);
             },
-            WindowEvent::ScaleFactorChanged {  .. } => {
+            WindowEvent::ScaleFactorChanged { .. } => {
                 let window_state = WindowState {
                     window_handle: self.window.window_handle(),
                     display_handle: self.window.display_handle(),

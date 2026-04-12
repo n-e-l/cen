@@ -1,5 +1,5 @@
 use ash::vk;
-use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, ImageLayout, Offset2D, Rect2D, RenderingAttachmentInfo};
+use ash::vk::{AccessFlags, AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, ImageLayout, Offset2D, PipelineStageFlags, Rect2D, RenderingAttachmentInfo};
 use egui::{Context, FullOutput, TextureId, ViewportId};
 use egui_ash_renderer::{DynamicRendering, Options};
 use egui_ash_renderer::vulkan::{create_vulkan_descriptor_set, create_vulkan_descriptor_set_layout};
@@ -183,6 +183,17 @@ impl RenderComponent for GuiSystem {
                 output.pixels_per_point
             );
 
+            // Ensure the swapchain image is in the correct layout
+            ctx.command_buffer.image_barrier(
+                ctx.swapchain_image,
+                ImageLayout::UNDEFINED,
+                ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                PipelineStageFlags::TOP_OF_PIPE,
+                PipelineStageFlags::FRAGMENT_SHADER,
+                AccessFlags::NONE,
+                AccessFlags::SHADER_WRITE
+            );
+
             let color_attachments = vec![
                 RenderingAttachmentInfo::default()
                     .image_layout(ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -212,6 +223,17 @@ impl RenderComponent for GuiSystem {
             }
 
             ctx.command_buffer.end_rendering();
+
+            // Set the swapchain image back to present
+            ctx.command_buffer.image_barrier(
+                ctx.swapchain_image,
+                ImageLayout::UNDEFINED,
+                ImageLayout::PRESENT_SRC_KHR,
+                PipelineStageFlags::FRAGMENT_SHADER,
+                PipelineStageFlags::BOTTOM_OF_PIPE,
+                AccessFlags::SHADER_WRITE,
+                AccessFlags::NONE
+            );
         }
     }
 }

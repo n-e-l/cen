@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::{BufferImageCopy, DeviceSize, FenceCreateFlags, ImageAspectFlags, ImageCopy, ImageLayout, WriteDescriptorSet};
+use ash::vk::{BufferImageCopy, DeviceSize, FenceCreateFlags, ImageAspectFlags, ImageCopy, ImageLayout, ImageMemoryBarrier, WriteDescriptorSet};
 use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, Image, Pipeline, RenderPass};
 use crate::vulkan::device::DeviceInner;
 use crate::vulkan::memory::GpuResource;
@@ -121,6 +121,50 @@ impl CommandBuffer {
         }
     }
 
+    pub fn image_barriers<'a>(
+        &mut self,
+        images: &[&dyn Image],
+        old_layout: vk::ImageLayout,
+        new_layout: vk::ImageLayout,
+        src_stage_mask: vk::PipelineStageFlags,
+        dst_stage_mask: vk::PipelineStageFlags,
+        src_access_flags: vk::AccessFlags,
+        dst_access_flags: vk::AccessFlags,
+    )
+    {
+        images.iter().for_each(|image| self.track(*image));
+
+        let image_memory_barriers = images.iter().map(|i| {
+
+            vk::ImageMemoryBarrier::default()
+                .old_layout(old_layout)
+                .new_layout(new_layout)
+                .src_access_mask(src_access_flags)
+                .dst_access_mask(dst_access_flags)
+                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .image(i.handle())
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+        }).collect::<Vec<ImageMemoryBarrier>>();
+        unsafe {
+            self.inner.device_dep.device.cmd_pipeline_barrier(
+                self.inner.command_buffer,
+                src_stage_mask,
+                dst_stage_mask,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &image_memory_barriers
+            )
+        }
+    }
+
     pub fn image_barrier<'a>(
         &mut self,
         image: &impl Image,
@@ -176,7 +220,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn bind_push_descriptor_images(&mut self, pipeline: &dyn Pipeline, images: &[&impl Image]) {
+    pub fn bind_push_descriptor_images(&mut self, pipeline: &dyn Pipeline, images: &[&dyn Image]) {
         self.track(pipeline.resource());
         images.iter().for_each(|image| self.track(*image));
 

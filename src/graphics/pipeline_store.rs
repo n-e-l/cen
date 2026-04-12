@@ -93,6 +93,32 @@ impl PipelineStore {
         Ok(key)
     }
 
+    pub fn insert_safe(&mut self, config: PipelineConfig) -> PipelineKey {
+        let mut inner = self.inner.lock().unwrap();
+
+        // Watch for file changes
+        inner.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
+
+        let pipeline = match ComputePipeline::new(
+            &inner.device,
+            config.shader_path.clone(),
+            config.descriptor_set_layouts.as_slice(),
+            config.push_constant_ranges.as_slice(),
+            &config.macros
+        ) {
+            Ok(p) => { p },
+            Err(e) => {
+                error!("{}", e);
+                panic!()
+            }
+        };
+
+        inner.pipelines.insert(PipelineHandle {
+            config,
+            pipeline
+        })
+    }
+
     pub fn insert(&mut self, config: PipelineConfig) -> Result<PipelineKey, PipelineErr> {
         let mut inner = self.inner.lock().unwrap();
 
