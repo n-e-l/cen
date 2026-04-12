@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::{BufferImageCopy, DeviceSize, FenceCreateFlags, ImageAspectFlags, ImageCopy, ImageLayout, WriteDescriptorSet};
+use ash::vk::{BufferImageCopy, DeviceSize, FenceCreateFlags, ImageAspectFlags, ImageCopy, ImageLayout, ImageMemoryBarrier, WriteDescriptorSet};
 use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, Image, Pipeline, RenderPass};
 use crate::vulkan::device::DeviceInner;
 use crate::vulkan::memory::GpuResource;
@@ -121,9 +121,53 @@ impl CommandBuffer {
         }
     }
 
+    pub fn image_barriers<'a>(
+        &mut self,
+        images: &[&dyn Image],
+        old_layout: vk::ImageLayout,
+        new_layout: vk::ImageLayout,
+        src_stage_mask: vk::PipelineStageFlags,
+        dst_stage_mask: vk::PipelineStageFlags,
+        src_access_flags: vk::AccessFlags,
+        dst_access_flags: vk::AccessFlags,
+    )
+    {
+        images.iter().for_each(|image| self.track(*image));
+
+        let image_memory_barriers = images.iter().map(|i| {
+
+            vk::ImageMemoryBarrier::default()
+                .old_layout(old_layout)
+                .new_layout(new_layout)
+                .src_access_mask(src_access_flags)
+                .dst_access_mask(dst_access_flags)
+                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .image(i.handle())
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+        }).collect::<Vec<ImageMemoryBarrier>>();
+        unsafe {
+            self.inner.device_dep.device.cmd_pipeline_barrier(
+                self.inner.command_buffer,
+                src_stage_mask,
+                dst_stage_mask,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &image_memory_barriers
+            )
+        }
+    }
+
     pub fn image_barrier<'a>(
         &mut self,
-        image: &Image,
+        image: &impl Image,
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
         src_stage_mask: vk::PipelineStageFlags,
@@ -141,7 +185,7 @@ impl CommandBuffer {
             .dst_access_mask(dst_access_flags)
             .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
             .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .image(*image.handle())
+            .image(image.handle())
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask: ImageAspectFlags::COLOR,
                 base_mip_level: 0,
@@ -176,7 +220,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn bind_push_descriptor_images(&mut self, pipeline: &dyn Pipeline, images: &Vec<&Image>) {
+    pub fn bind_push_descriptor_images(&mut self, pipeline: &dyn Pipeline, images: &[&dyn Image]) {
         self.track(pipeline.resource());
         images.iter().for_each(|image| self.track(*image));
 
@@ -204,7 +248,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn bind_push_descriptor_image(&mut self, pipeline: &dyn Pipeline, image: &Image) {
+    pub fn bind_push_descriptor_image(&mut self, pipeline: &dyn Pipeline, set: u32, image: &impl Image) {
         self.track(image);
         self.track(pipeline.resource());
 
@@ -225,7 +269,7 @@ impl CommandBuffer {
                 self.inner.command_buffer,
                 pipeline.bind_point(),
                 pipeline.layout(),
-                0,
+                set,
                 &[write_descriptor_set]
             );
         }
@@ -275,7 +319,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn clear_color_image_u32<'a>(&mut self, image: &Image, layout: ImageLayout, color: [u32; 4])
+    pub fn clear_color_image_u32<'a>(&mut self, image: &impl Image, layout: ImageLayout, color: [u32; 4])
     {
         self.track(image);
 
@@ -291,7 +335,7 @@ impl CommandBuffer {
             self.inner.device_dep.device
                 .cmd_clear_color_image(
                     self.inner.command_buffer,
-                    *image.handle(),
+                    image.handle(),
                     layout,
                     &clear_color_value,
                     &sub_resource_ranges
@@ -299,7 +343,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn clear_color_image<'a>(&mut self, image: &Image, layout: ImageLayout, color: [f32; 4])
+    pub fn clear_color_image<'a>(&mut self, image: &impl Image, layout: ImageLayout, color: [f32; 4])
     {
         self.track(image);
 
@@ -315,7 +359,7 @@ impl CommandBuffer {
             self.inner.device_dep.device
                 .cmd_clear_color_image(
                     self.inner.command_buffer,
-                    *image.handle(),
+                    image.handle(),
                     layout,
                     &clear_color_value,
                     &sub_resource_ranges
@@ -323,7 +367,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn blit_image<'a>(&mut self, src_image: &Image, src_layout: ImageLayout, dst_image: &Image, dst_layout: ImageLayout, regions: &[vk::ImageBlit], filter: vk::Filter)
+    pub fn blit_image<'a>(&mut self, src_image: &impl Image, src_layout: ImageLayout, dst_image: &impl Image, dst_layout: ImageLayout, regions: &[vk::ImageBlit], filter: vk::Filter)
     {
         self.track(src_image);
         self.track(dst_image);
@@ -331,9 +375,9 @@ impl CommandBuffer {
         unsafe {
             self.inner.device_dep.device.cmd_blit_image(
                 self.inner.command_buffer,
-                *src_image.handle(),
+                src_image.handle(),
                 src_layout,
-                *dst_image.handle(),
+                dst_image.handle(),
                 dst_layout,
                 regions,
                 filter,
@@ -372,7 +416,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn copy_buffer_to_image(&mut self, buffer: &Buffer, image: &Image, layout: ImageLayout, regions: &[BufferImageCopy])
+    pub fn copy_buffer_to_image(&mut self, buffer: &Buffer, image: &impl Image, layout: ImageLayout, regions: &[BufferImageCopy])
     {
         self.track(buffer);
         self.track(image);
@@ -382,14 +426,14 @@ impl CommandBuffer {
                 .cmd_copy_buffer_to_image(
                     self.inner.command_buffer,
                     *buffer.handle(),
-                    *image.handle(),
+                    image.handle(),
                     layout,
                     regions
                 );
         }
     }
 
-    pub fn copy_image_to_buffer(&mut self, image: &Image, layout: ImageLayout, buffer: &Buffer, regions: &[BufferImageCopy]) {
+    pub fn copy_image_to_buffer(&mut self, image: &impl Image, layout: ImageLayout, buffer: &Buffer, regions: &[BufferImageCopy]) {
         self.track(image);
         self.track(buffer);
 
@@ -397,7 +441,7 @@ impl CommandBuffer {
             self.inner.device_dep.device
                 .cmd_copy_image_to_buffer(
                     self.inner.command_buffer,
-                    *image.handle(),
+                    image.handle(),
                     layout,
                     *buffer.handle(),
                     regions
@@ -405,7 +449,7 @@ impl CommandBuffer {
         }
     }
     
-    pub fn copy_image(&mut self, from: &Image, from_layout: ImageLayout, to: &Image, to_layout: ImageLayout, regions: &[ImageCopy]) {
+    pub fn copy_image(&mut self, from: &impl Image, from_layout: ImageLayout, to: &impl Image, to_layout: ImageLayout, regions: &[ImageCopy]) {
         self.track(from);
         self.track(to);
 
@@ -413,9 +457,9 @@ impl CommandBuffer {
             self.inner.device_dep.device
                 .cmd_copy_image(
                     self.inner.command_buffer,
-                    *from.handle(),
+                    from.handle(),
                     from_layout,
-                    *to.handle(),
+                    to.handle(),
                     to_layout,
                     regions
                 );

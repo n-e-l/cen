@@ -7,6 +7,7 @@ use crate::graphics::renderer::WindowState;
 use crate::vulkan;
 use crate::vulkan::{Device, Image, Instance, Surface, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
+use crate::vulkan::image::SwapchainImage;
 
 /// Vulkan does not have a concept of a "default framebuffer". Instead, we need a framework that "owns" the images that will eventually be presented to the screen.
 /// The general purpose of the swapchain is to synchronize the presentation of images with the refresh rate of the screen.
@@ -15,7 +16,7 @@ pub struct SwapchainInner {
     device_dep: Arc<DeviceInner>,
     swapchain_loader: swapchain::Device,
     swapchain: vk::SwapchainKHR,
-    images: Vec<vulkan::Image>,
+    images: Vec<SwapchainImage>,
     extent: vk::Extent2D,
     format: SurfaceFormatKHR
 }
@@ -117,8 +118,8 @@ impl Swapchain {
         let swapchain = unsafe { swapchain_loader.create_swapchain(&create_info, None).unwrap() };
 
         let images = unsafe { swapchain_loader.get_swapchain_images(swapchain).unwrap() }.iter()
-            .map(|&image| vulkan::Image::from_raw(device, image, surface_format.format, extent))
-            .collect::<Vec<vulkan::Image>>();
+            .map(|&image| vulkan::SwapchainImage::from_raw(device, image, surface_format.format, extent))
+            .collect::<Vec<vulkan::SwapchainImage>>();
 
         let swapchain_inner = SwapchainInner {
             device_dep: device.inner.clone(),
@@ -126,7 +127,7 @@ impl Swapchain {
             swapchain,
             images,
             extent,
-            format: *surface_format
+            format: *surface_format,
         };
 
         Self {
@@ -134,7 +135,7 @@ impl Swapchain {
         }
     }
 
-    pub fn get_images(&self) -> &Vec<Image> {
+    pub fn get_images(&self) -> &Vec<SwapchainImage> {
         &self.inner.images
     }
 

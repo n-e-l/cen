@@ -9,7 +9,7 @@ use crate::app::gui::{GuiSystem};
 use crate::app::component::{ComponentRegistry};
 use crate::app::Window;
 use crate::graphics::pipeline_store::PipelineStore;
-use crate::graphics::Renderer;
+use crate::graphics::{DynamicImage, Renderer, WeakDynamicImage};
 use crate::graphics::renderer::{WindowState};
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device};
 
@@ -37,7 +37,15 @@ pub struct InitContext<'a> {
     pub swapchain_extent: Extent2D,
     pub queue: &'a Queue,
     pub command_pool: &'a CommandPool,
+    resizable_images: Vec<WeakDynamicImage>
 }
+
+impl InitContext<'_> {
+    pub fn register_resizable_image(&mut self, image: &DynamicImage) {
+        self.resizable_images.push(image.weak())
+    }
+}
+
 pub type InitCallback = Box<dyn FnOnce(&mut InitContext) -> ComponentRegistry>;
 
 impl Engine {
@@ -71,8 +79,15 @@ impl Engine {
             swapchain_extent: renderer.swapchain.get_extent(),
             queue: &renderer.queue,
             command_pool: &renderer.command_pool,
+            resizable_images: Vec::new()
         };
         let registry: ComponentRegistry = init_callback(&mut init_context);
+
+        // Pass the resizable images to the renderer
+        init_context.resizable_images.iter().for_each(|i| {
+            renderer.register_dynamic_image(i);
+        });
+
         command_buffer.end();
         renderer.submit_single_time_command_buffer(command_buffer);
 
@@ -122,16 +137,16 @@ impl Engine {
                     extent2d: self.window.get_extent(),
                     scale_factor: self.window.scale_factor(),
                 };
-                self.renderer.recreate_window(window_state);
+                self.renderer.on_window_recreation(window_state);
             },
-            WindowEvent::ScaleFactorChanged {  .. } => {
+            WindowEvent::ScaleFactorChanged { .. } => {
                 let window_state = WindowState {
                     window_handle: self.window.window_handle(),
                     display_handle: self.window.display_handle(),
                     extent2d: self.window.get_extent(),
                     scale_factor: self.window.scale_factor(),
                 };
-                self.renderer.recreate_window(window_state);
+                self.renderer.on_window_recreation(window_state);
             }
             _ => (),
         }

@@ -1,5 +1,5 @@
 use ash::vk;
-use ash::vk::{AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, ImageLayout, Offset2D, Rect2D, RenderingAttachmentInfo};
+use ash::vk::{AccessFlags, AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, ImageLayout, Offset2D, PipelineStageFlags, Rect2D, RenderingAttachmentInfo};
 use egui::{Context, FullOutput, TextureId, ViewportId};
 use egui_ash_renderer::{DynamicRendering, Options};
 use egui_ash_renderer::vulkan::{create_vulkan_descriptor_set, create_vulkan_descriptor_set_layout};
@@ -11,7 +11,6 @@ use crate::vulkan::{Device, DescriptorPool, Image};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use log::{error, trace};
-use crate::vulkan::memory::GpuResource;
 use std::any::Any;
 
 pub trait GuiComponent {
@@ -52,7 +51,7 @@ pub struct GuiHandler<'a>
 }
 impl GuiHandler<'_>
 {
-    pub fn create_texture(&mut self, image: &Image) -> TextureId {
+    pub fn create_texture(&mut self, image: &impl Image) -> TextureId {
         let device = self.device.handle();
         let descriptor_set = create_vulkan_descriptor_set(
             device,
@@ -184,6 +183,17 @@ impl RenderComponent for GuiSystem {
                 output.pixels_per_point
             );
 
+            // Ensure the swapchain image is in the correct layout
+            ctx.command_buffer.image_barrier(
+                ctx.swapchain_image,
+                ImageLayout::UNDEFINED,
+                ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                PipelineStageFlags::TOP_OF_PIPE,
+                PipelineStageFlags::FRAGMENT_SHADER,
+                AccessFlags::NONE,
+                AccessFlags::SHADER_WRITE
+            );
+
             let color_attachments = vec![
                 RenderingAttachmentInfo::default()
                     .image_layout(ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -202,7 +212,7 @@ impl RenderComponent for GuiSystem {
             // Egui draw call
             match self.egui_renderer.cmd_draw(
                 ctx.command_buffer.handle(),
-                ctx.swapchain_image.extent(),
+                vk::Extent2D { width: ctx.swapchain_image.width(), height: ctx.swapchain_image.height() },
                 output.pixels_per_point,
                 clipped_primitives.as_slice()
             ) {
@@ -213,6 +223,17 @@ impl RenderComponent for GuiSystem {
             }
 
             ctx.command_buffer.end_rendering();
+
+            // Set the swapchain image back to present
+            ctx.command_buffer.image_barrier(
+                ctx.swapchain_image,
+                ImageLayout::UNDEFINED,
+                ImageLayout::PRESENT_SRC_KHR,
+                PipelineStageFlags::FRAGMENT_SHADER,
+                PipelineStageFlags::BOTTOM_OF_PIPE,
+                AccessFlags::SHADER_WRITE,
+                AccessFlags::NONE
+            );
         }
     }
 }

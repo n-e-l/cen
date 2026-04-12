@@ -7,12 +7,13 @@ use cen::app::app::{AppConfig, Cen};
 use cen::app::gui::{GuiComponent, GuiHandler};
 use cen::app::component::{Component, ComponentRegistry};
 use cen::app::engine::InitContext;
+use cen::graphics::DynamicImage;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
-use cen::vulkan::{DescriptorSetLayout, Image};
+use cen::vulkan::{DescriptorSetLayout, Image, ImageConfig};
 
 #[allow(dead_code)]
 struct ComputeRender {
-    image: Image,
+    image: DynamicImage,
     descriptorset: DescriptorSetLayout,
     pipeline_a: PipelineKey,
     pipeline_b: PipelineKey,
@@ -23,13 +24,15 @@ impl ComputeRender {
     fn new(ctx: &mut InitContext) -> Self {
 
         // Image
-        let image = Image::new_rgba(
+        let image = DynamicImage::new(
             &ctx.device,
             &mut ctx.allocator,
-            ctx.swapchain_extent.width,
-            ctx.swapchain_extent.height,
-            vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST
+            ImageConfig::default()
+                .width(ctx.swapchain_extent.width)
+                .height(ctx.swapchain_extent.height)
+                .image_usage_flags(vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST)
         );
+        ctx.register_resizable_image(&image);
 
         // Layout
         let layout_bindings = &[
@@ -76,17 +79,6 @@ impl ComputeRender {
 
 impl RenderComponent for ComputeRender {
     fn render(&mut self, ctx: &mut RenderContext) {
-
-        if self.image.width() != ctx.swapchain_image.width() || self.image.height() != ctx.swapchain_image.height() {
-            // Recreate image
-            self.image = Image::new_rgba(
-                &ctx.device,
-                &mut ctx.allocator,
-                ctx.swapchain_image.width(),
-                ctx.swapchain_image.height(),
-                vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST
-            );
-        }
 
         ctx.command_buffer.image_barrier(
             &self.image,
