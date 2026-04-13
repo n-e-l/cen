@@ -27,6 +27,7 @@ pub struct AppConfig {
     pub(crate) log_fps: bool,
     pub(crate) fullscreen: bool,
     pub(crate) resizable: bool,
+    pub(crate) title: String,
 }
 
 impl AppConfig {
@@ -39,6 +40,7 @@ impl AppConfig {
             log_fps: false,
             fullscreen: false,
             resizable: false,
+            title: "cen".to_string()
         }
     }
 
@@ -69,6 +71,11 @@ impl AppConfig {
 
     pub fn resizable(mut self, resizable: bool) -> Self {
         self.resizable = resizable;
+        self
+    }
+
+    pub fn title(mut self, title: &str) -> Self {
+        self.title = title.to_string();
         self
     }
 
