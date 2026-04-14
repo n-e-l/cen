@@ -102,11 +102,7 @@ impl GuiSystem {
         let device = renderer.device.clone();
         let renderer_descriptor_pool = DescriptorPool::new(&renderer.device, 10000);
 
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
-        let preferred_format = vk::Format::R8G8B8A8_SRGB;
-
-        #[cfg(target_os = "macos")]
-        let preferred_format = vk::Format::B8G8R8A8_SRGB;
+        let preferred_format = renderer.swapchain.get_format().format;
 
         let egui_renderer = egui_ash_renderer::Renderer::with_gpu_allocator(
             renderer.allocator.inner.lock().unwrap().allocator.clone(),
