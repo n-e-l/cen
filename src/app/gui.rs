@@ -182,7 +182,7 @@ impl RenderComponent for GuiSystem {
             // Ensure the swapchain image is in the correct layout
             ctx.command_buffer.image_barrier(
                 ctx.swapchain_image,
-                ImageLayout::UNDEFINED,
+                ImageLayout::PRESENT_SRC_KHR,
                 ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                 PipelineStageFlags::TOP_OF_PIPE,
                 PipelineStageFlags::FRAGMENT_SHADER,
@@ -223,7 +223,7 @@ impl RenderComponent for GuiSystem {
             // Set the swapchain image back to present
             ctx.command_buffer.image_barrier(
                 ctx.swapchain_image,
-                ImageLayout::UNDEFINED,
+                ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                 ImageLayout::PRESENT_SRC_KHR,
                 PipelineStageFlags::FRAGMENT_SHADER,
                 PipelineStageFlags::BOTTOM_OF_PIPE,
