@@ -72,9 +72,6 @@ impl Window {
                 Key::Named(NamedKey::Escape) => {
                     event_loop.exit();
                 },
-                Key::Character("q") => {
-                    event_loop.exit();
-                }
                 _ => {}
             },
             _ => {}
