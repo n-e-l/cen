@@ -26,14 +26,10 @@ struct PipelineHandle {
     pipeline: ComputePipeline,
 }
 
-struct PipelineStoreInner {
+pub struct PipelineStore {
     device: Device,
     pipelines: SlotMap<PipelineKey, PipelineHandle>,
     watcher: Debouncer<RecommendedWatcher>,
-}
-
-pub struct PipelineStore {
-    inner: Arc<Mutex<PipelineStoreInner>>,
 }
 
 impl PipelineStore {
@@ -47,11 +43,9 @@ impl PipelineStore {
         ;
 
         PipelineStore {
-            inner: Arc::new(Mutex::new(PipelineStoreInner{
-                watcher,
-                device: device.clone(),
-                pipelines: SlotMap::with_key(),
-            }))
+            watcher,
+            device: device.clone(),
+            pipelines: SlotMap::with_key(),
         }
     }
 
@@ -73,20 +67,18 @@ impl PipelineStore {
     }
 
     pub fn update(&mut self, key: PipelineKey, config: PipelineConfig) -> Result<PipelineKey, PipelineErr> {
-        let mut inner = self.inner.lock().unwrap();
-
         // Watch for file changes
-        inner.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
+        self.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
 
         let pipeline = ComputePipeline::new(
-            &inner.device,
+            &self.device,
             config.shader_path.clone(),
             config.descriptor_set_layouts.as_slice(),
             config.push_constant_ranges.as_slice(),
             &config.macros
         )?;
 
-        let handle = inner.pipelines.get_mut(key).expect("Key not found");
+        let handle = self.pipelines.get_mut(key).expect("Key not found");
         handle.config = config;
         handle.pipeline = pipeline;
 
@@ -94,13 +86,11 @@ impl PipelineStore {
     }
 
     pub fn insert_safe(&mut self, config: PipelineConfig) -> PipelineKey {
-        let mut inner = self.inner.lock().unwrap();
-
         // Watch for file changes
-        inner.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
+        self.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
 
         let pipeline = match ComputePipeline::new(
-            &inner.device,
+            &self.device,
             config.shader_path.clone(),
             config.descriptor_set_layouts.as_slice(),
             config.push_constant_ranges.as_slice(),
@@ -113,47 +103,41 @@ impl PipelineStore {
             }
         };
 
-        inner.pipelines.insert(PipelineHandle {
+        self.pipelines.insert(PipelineHandle {
             config,
             pipeline
         })
     }
 
     pub fn insert(&mut self, config: PipelineConfig) -> Result<PipelineKey, PipelineErr> {
-        let mut inner = self.inner.lock().unwrap();
-
         // Watch for file changes
-        inner.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
+        self.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
 
         let pipeline = ComputePipeline::new(
-            &inner.device,
+            &self.device,
             config.shader_path.clone(),
             config.descriptor_set_layouts.as_slice(),
             config.push_constant_ranges.as_slice(),
             &config.macros
         )?;
 
-        Ok(inner.pipelines.insert(PipelineHandle {
+        Ok(self.pipelines.insert(PipelineHandle {
             config,
             pipeline
         }))
     }
 
-    #[warn(dead_code)]
     pub fn get(&self, key: PipelineKey) -> Option<ComputePipeline> {
-        self.inner.lock().unwrap().pipelines.get(key).map(|p| p.pipeline.clone())
+        self.pipelines.get(key).map(|p| p.pipeline.clone())
     }
 
     pub fn reload(&mut self, path: &PathBuf) -> Result<(), PipelineErr> {
-        let mut inner = self.inner.lock().unwrap();
-        let device = inner.device.clone();
-
         // Look through all shaders with the given path and recreate them
-        for handle in inner.pipelines.iter_mut() {
+        for handle in self.pipelines.iter_mut() {
             let config = &handle.1.config;
             if path.ends_with(&config.shader_path) {
                 let pipeline = ComputePipeline::new(
-                    &device,
+                    &self.device,
                     config.shader_path.clone(),
                     config.descriptor_set_layouts.as_slice(),
                     config.push_constant_ranges.as_slice(),
