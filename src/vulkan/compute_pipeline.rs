@@ -4,7 +4,6 @@ use std::ffi::CString;
 use std::path::PathBuf;
 use std::sync::Arc;
 use ash::vk;
-use ash::vk::PushConstantRange;
 use log::{trace};
 use crate::vulkan::{DescriptorSetLayout, Device, GpuHandle, Pipeline, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;

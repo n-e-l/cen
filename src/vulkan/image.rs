@@ -1,8 +1,7 @@
 use std::any::Any;
 use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::{ComponentMapping, DescriptorImageInfo, Extent2D, Filter, ImageAspectFlags, ImageLayout, ImageView, Sampler};
-use derive_builder::Builder;
+use ash::vk::{ComponentMapping, DescriptorImageInfo, Extent2D, ImageAspectFlags, ImageLayout, ImageView, Sampler};
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
 use log::{trace};

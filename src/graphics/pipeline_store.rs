@@ -1,8 +1,5 @@
-use std::collections::HashMap;
 use std::path::{PathBuf};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use ash::vk;
 use log::error;
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer};
@@ -10,16 +7,16 @@ use notify_debouncer_mini::DebouncedEventKind::Any;
 use slotmap::{new_key_type, SlotMap};
 use winit::event_loop::{EventLoopProxy};
 use crate::app::app::UserEvent;
-use crate::vulkan::{GraphicsPipelineConfig, ComputePipeline, DescriptorSetLayout, Device, GraphicsPipeline, Pipeline, PipelineErr, ComputePipelineConfig};
+use crate::vulkan::{GraphicsPipelineConfig, ComputePipeline, Device, GraphicsPipeline, Pipeline, PipelineErr, ComputePipelineConfig};
 
 new_key_type! { pub struct PipelineKey; }
 
-enum PipelineHandle {
+pub enum PipelineHandle {
     Graphics(GraphicsPipelineConfig, GraphicsPipeline),
     Compute(ComputePipelineConfig, ComputePipeline),
 }
 
-trait IntoPipelineHandle {
+pub trait IntoPipelineHandle {
     fn into_pipeline_handle(self, device: &Device) -> Result<PipelineHandle, PipelineErr>;
     fn shader_paths(&self) -> Vec<&PathBuf>;
 }

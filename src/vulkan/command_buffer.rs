@@ -315,7 +315,7 @@ impl CommandBuffer {
         instance_count: u32,
         first_index: u32,
         vertex_offset: i32,
-        first_instance: u32,
+        _first_instance: u32,
     ) {
         unsafe {
             self.inner.device_dep.device
