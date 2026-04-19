@@ -1,8 +1,5 @@
-use std::collections::HashMap;
 use std::path::{PathBuf};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use ash::vk;
 use log::error;
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer};
@@ -10,20 +7,48 @@ use notify_debouncer_mini::DebouncedEventKind::Any;
 use slotmap::{new_key_type, SlotMap};
 use winit::event_loop::{EventLoopProxy};
 use crate::app::app::UserEvent;
-use crate::vulkan::{ComputePipeline, DescriptorSetLayout, Device, PipelineErr};
-
-pub struct PipelineConfig {
-    pub shader_path: PathBuf,
-    pub descriptor_set_layouts: Vec<DescriptorSetLayout>,
-    pub push_constant_ranges: Vec<vk::PushConstantRange>,
-    pub macros: HashMap<String, String>,
-}
+use crate::vulkan::{GraphicsPipelineConfig, ComputePipeline, Device, GraphicsPipeline, Pipeline, PipelineErr, ComputePipelineConfig};
 
 new_key_type! { pub struct PipelineKey; }
 
-struct PipelineHandle {
-    config: PipelineConfig,
-    pipeline: ComputePipeline,
+pub enum PipelineHandle {
+    Graphics(GraphicsPipelineConfig, GraphicsPipeline),
+    Compute(ComputePipelineConfig, ComputePipeline),
+}
+
+pub trait IntoPipelineHandle {
+    fn into_pipeline_handle(self, device: &Device) -> Result<PipelineHandle, PipelineErr>;
+    fn shader_paths(&self) -> Vec<&PathBuf>;
+}
+
+impl IntoPipelineHandle for GraphicsPipelineConfig {
+    fn into_pipeline_handle(self, device: &Device) -> Result<PipelineHandle, PipelineErr> {
+        let pipeline = GraphicsPipeline::new(
+            device,
+            self.clone()
+        )?;
+
+        Ok(PipelineHandle::Graphics(self, pipeline))
+    }
+
+    fn shader_paths(&self) -> Vec<&PathBuf> {
+        vec![&self.fragment_shader_source, &self.vertex_shader_source]
+    }
+}
+
+impl IntoPipelineHandle for ComputePipelineConfig {
+    fn into_pipeline_handle(self, device: &Device) -> Result<PipelineHandle, PipelineErr> {
+        let pipeline = ComputePipeline::new(
+            device,
+            self.clone()
+        )?;
+
+        Ok(PipelineHandle::Compute(self, pipeline))
+    }
+
+    fn shader_paths(&self) -> Vec<&PathBuf> {
+        vec![&self.shader_source]
+    }
 }
 
 pub struct PipelineStore {
@@ -66,84 +91,57 @@ impl PipelineStore {
         }
     }
 
-    pub fn update(&mut self, key: PipelineKey, config: PipelineConfig) -> Result<PipelineKey, PipelineErr> {
+    pub fn insert(&mut self, config: impl IntoPipelineHandle) -> Result<PipelineKey, PipelineErr> {
+
         // Watch for file changes
-        self.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
+        config.shader_paths().iter().for_each(|path| {
+            self.watcher.watcher().watch(path.as_path(), RecursiveMode::Recursive).unwrap_or_else(|_|{
+                panic!("Failed to find path {:?}", path.as_path());
+            });
+        });
 
-        let pipeline = ComputePipeline::new(
-            &self.device,
-            config.shader_path.clone(),
-            config.descriptor_set_layouts.as_slice(),
-            config.push_constant_ranges.as_slice(),
-            &config.macros
-        )?;
+        Ok(self.pipelines.insert(config.into_pipeline_handle(&self.device)?))
+    }
 
-        let handle = self.pipelines.get_mut(key).expect("Key not found");
-        handle.config = config;
-        handle.pipeline = pipeline;
+    pub fn get(&self, key: PipelineKey) -> Option<&dyn Pipeline> {
+        self.pipelines.get(key)
+            .map(|handle| {
+                match handle {
+                    PipelineHandle::Graphics(_, pipeline) => {
+                        pipeline as &dyn Pipeline
+                    }
+                    PipelineHandle::Compute(_, pipeline) => {
+                        pipeline as &dyn Pipeline
+                    }
+                }
+            })
+    }
 
+    pub fn write(&mut self, key: PipelineKey, config: impl IntoPipelineHandle) -> Result<PipelineKey, PipelineErr> {
+        *self.pipelines.get_mut(key).expect("Key not found") = config.into_pipeline_handle(&self.device)?;
         Ok(key)
-    }
-
-    pub fn insert_safe(&mut self, config: PipelineConfig) -> PipelineKey {
-        // Watch for file changes
-        self.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
-
-        let pipeline = match ComputePipeline::new(
-            &self.device,
-            config.shader_path.clone(),
-            config.descriptor_set_layouts.as_slice(),
-            config.push_constant_ranges.as_slice(),
-            &config.macros
-        ) {
-            Ok(p) => { p },
-            Err(e) => {
-                error!("{}", e);
-                panic!()
-            }
-        };
-
-        self.pipelines.insert(PipelineHandle {
-            config,
-            pipeline
-        })
-    }
-
-    pub fn insert(&mut self, config: PipelineConfig) -> Result<PipelineKey, PipelineErr> {
-        // Watch for file changes
-        self.watcher.watcher().watch(config.shader_path.as_path(), RecursiveMode::Recursive).unwrap();
-
-        let pipeline = ComputePipeline::new(
-            &self.device,
-            config.shader_path.clone(),
-            config.descriptor_set_layouts.as_slice(),
-            config.push_constant_ranges.as_slice(),
-            &config.macros
-        )?;
-
-        Ok(self.pipelines.insert(PipelineHandle {
-            config,
-            pipeline
-        }))
-    }
-
-    pub fn get(&self, key: PipelineKey) -> Option<ComputePipeline> {
-        self.pipelines.get(key).map(|p| p.pipeline.clone())
     }
 
     pub fn reload(&mut self, path: &PathBuf) -> Result<(), PipelineErr> {
         // Look through all shaders with the given path and recreate them
-        for handle in self.pipelines.iter_mut() {
-            let config = &handle.1.config;
-            if path.ends_with(&config.shader_path) {
-                let pipeline = ComputePipeline::new(
-                    &self.device,
-                    config.shader_path.clone(),
-                    config.descriptor_set_layouts.as_slice(),
-                    config.push_constant_ranges.as_slice(),
-                    &config.macros
-                )?;
-                handle.1.pipeline = pipeline;
+        for (_, handle) in self.pipelines.iter_mut() {
+            match handle {
+                PipelineHandle::Graphics(config, pipeline) => {
+                    if path.ends_with(&config.vertex_shader_source) || path.ends_with(&config.fragment_shader_source) {
+                        *pipeline = GraphicsPipeline::new(
+                            &self.device,
+                            config.clone()
+                        )?;
+                    }
+                }
+                PipelineHandle::Compute(config, pipeline) => {
+                    if path.ends_with(&config.shader_source) {
+                        *pipeline = ComputePipeline::new(
+                            &self.device,
+                            config.clone()
+                        )?;
+                    }
+                }
             }
         }
 

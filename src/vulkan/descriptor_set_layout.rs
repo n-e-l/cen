@@ -10,6 +10,7 @@ struct DescriptorSetLayoutInner {
     layout: vk::DescriptorSetLayout,
 }
 
+#[derive(Clone)]
 pub struct DescriptorSetLayout {
     inner: Arc<DescriptorSetLayoutInner>,
 }

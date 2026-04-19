@@ -17,6 +17,7 @@ pub struct BufferInner {
     pub allocation: Mutex<Option<Allocation>>,
 }
 
+#[derive(Clone)]
 pub struct Buffer {
     inner: Arc<BufferInner>,
 }

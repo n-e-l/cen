@@ -7,7 +7,7 @@ use egui_winit::State;
 use crate::app::Window;
 use crate::graphics::Renderer;
 use crate::graphics::renderer::{RenderComponent, RenderContext};
-use crate::vulkan::{Device, DescriptorPool, Image};
+use crate::vulkan::{Device, DescriptorPool, ImageTrait};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use log::{error, trace};
@@ -51,7 +51,7 @@ pub struct GuiHandler<'a>
 }
 impl GuiHandler<'_>
 {
-    pub fn create_texture(&mut self, image: &impl Image) -> TextureId {
+    pub fn create_texture(&mut self, image: &impl ImageTrait) -> TextureId {
         let device = self.device.handle();
         let descriptor_set = create_vulkan_descriptor_set(
             device,

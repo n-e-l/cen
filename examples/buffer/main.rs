@@ -7,7 +7,7 @@ use cen::app::app::AppConfig;
 use cen::app::component::{Component, ComponentRegistry};
 use cen::app::engine::InitContext;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
-use cen::vulkan::{Buffer, Image};
+use cen::vulkan::{Buffer, ImageTrait};
 
 struct ComputeRender {
     buffer: Buffer,

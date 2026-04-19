@@ -9,7 +9,8 @@ use crate::app::gui::{GuiSystem};
 use crate::app::component::{ComponentRegistry};
 use crate::app::Window;
 use crate::graphics::pipeline_store::PipelineStore;
-use crate::graphics::{DynamicImage, Renderer, WeakDynamicImage};
+use crate::graphics::{Renderer};
+use crate::graphics::image_store::{ImageKey, ImageStore};
 use crate::graphics::renderer::{WindowState};
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device};
 
@@ -32,17 +33,18 @@ pub struct InitContext<'a> {
     pub gui_system: &'a mut GuiSystem,
     pub device: &'a Device,
     pub allocator: &'a mut Allocator,
+    pub image_store: &'a mut ImageStore,
     pub pipeline_store: &'a mut PipelineStore,
     pub command_buffer: &'a mut CommandBuffer,
     pub swapchain_extent: Extent2D,
     pub queue: &'a Queue,
     pub command_pool: &'a CommandPool,
-    resizable_images: Vec<WeakDynamicImage>
+    resizable_images: Vec<ImageKey>
 }
 
 impl InitContext<'_> {
-    pub fn register_resizable_image(&mut self, image: &DynamicImage) {
-        self.resizable_images.push(image.weak())
+    pub fn register_resizable_image(&mut self, image: ImageKey) {
+        self.resizable_images.push(image)
     }
 }
 
@@ -74,6 +76,7 @@ impl Engine {
             gui_system: &mut gui_system,
             device: &renderer.device,
             allocator: &mut renderer.allocator,
+            image_store: &mut renderer.image_store,
             pipeline_store: &mut renderer.pipeline_store,
             command_buffer: &mut command_buffer,
             swapchain_extent: renderer.swapchain.get_extent(),
@@ -85,7 +88,7 @@ impl Engine {
 
         // Pass the resizable images to the renderer
         init_context.resizable_images.iter().for_each(|i| {
-            renderer.register_dynamic_image(i);
+            renderer.register_dynamic_image(*i);
         });
 
         command_buffer.end();
