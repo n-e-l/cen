@@ -11,6 +11,25 @@ use crate::vulkan::device::DeviceInner;
 use crate::vulkan::memory::GpuResource;
 use crate::vulkan::pipeline::{create_shader_module, load_shader_code, PipelineErr};
 
+#[derive(Clone)]
+pub struct ComputePipelineConfig {
+    pub shader_source: PathBuf,
+    pub descriptor_set_layouts: Vec<DescriptorSetLayout>,
+    pub push_constant_ranges: Vec<vk::PushConstantRange>,
+    pub macros: HashMap<String, String>,
+}
+
+impl Default for ComputePipelineConfig {
+    fn default() -> Self {
+        Self {
+            shader_source: "".into(),
+            descriptor_set_layouts: vec![],
+            push_constant_ranges: vec![],
+            macros: HashMap::new()
+        }
+    }
+}
+
 pub struct ComputePipelineInner {
     pub pipeline_layout: vk::PipelineLayout,
     pub compute_pipeline: vk::Pipeline,
@@ -30,6 +49,7 @@ impl Drop for ComputePipelineInner {
 
 impl GpuHandle for ComputePipelineInner {}
 
+#[derive(Clone)]
 pub struct ComputePipeline {
     inner: Arc<ComputePipelineInner>
 }
@@ -62,13 +82,10 @@ impl ComputePipeline {
 
 pub fn new(
     device: &Device,
-    shader_source: PathBuf,
-    layouts: &[DescriptorSetLayout],
-    push_constant_ranges: &[PushConstantRange],
-    macros: &HashMap<String, String>
+    config: ComputePipelineConfig
 ) -> Result<Self, PipelineErr> {
 
-        let shader_code = load_shader_code(shader_source, macros)?;
+        let shader_code = load_shader_code(config.shader_source, &config.macros)?;
         let shader_module = create_shader_module(device.handle(), shader_code.to_vec());
 
         let binding = CString::new("main").unwrap();
@@ -80,11 +97,11 @@ pub fn new(
         ];
 
         // Layout
-        let desc_layouts = layouts
+        let desc_layouts = config.descriptor_set_layouts
             .iter().map(|layout| layout.handle()).collect::<Vec<_>>();
         let create_info = vk::PipelineLayoutCreateInfo::default()
             .set_layouts(&desc_layouts)
-            .push_constant_ranges(push_constant_ranges);
+            .push_constant_ranges(&config.push_constant_ranges);
         let pipeline_layout = unsafe {
             device.handle()
                 .create_pipeline_layout(&create_info, None)
@@ -115,11 +132,5 @@ pub fn new(
         Ok(Self {
             inner: Arc::new(pipeline_inner)
         })
-    }
-
-    pub fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone()
-        }
     }
 }

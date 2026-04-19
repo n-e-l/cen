@@ -2,7 +2,7 @@ use std::any::Any;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use ash::vk::{BufferImageCopy, DeviceSize, FenceCreateFlags, ImageAspectFlags, ImageCopy, ImageLayout, ImageMemoryBarrier, WriteDescriptorSet};
-use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, Image, Pipeline, RenderPass};
+use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, ImageTrait, Pipeline, RenderPass};
 use crate::vulkan::device::DeviceInner;
 use crate::vulkan::memory::GpuResource;
 
@@ -123,7 +123,7 @@ impl CommandBuffer {
 
     pub fn image_barriers<'a>(
         &mut self,
-        images: &[&dyn Image],
+        images: &[&dyn ImageTrait],
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
         src_stage_mask: vk::PipelineStageFlags,
@@ -167,7 +167,7 @@ impl CommandBuffer {
 
     pub fn image_barrier<'a>(
         &mut self,
-        image: &impl Image,
+        image: &impl ImageTrait,
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
         src_stage_mask: vk::PipelineStageFlags,
@@ -220,7 +220,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn bind_push_descriptor_images(&mut self, pipeline: &dyn Pipeline, images: &[&dyn Image]) {
+    pub fn bind_push_descriptor_images(&mut self, pipeline: &dyn Pipeline, images: &[&dyn ImageTrait]) {
         self.track(pipeline.resource());
         images.iter().for_each(|image| self.track(*image));
 
@@ -248,7 +248,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn bind_push_descriptor_image(&mut self, pipeline: &dyn Pipeline, set: u32, image: &impl Image) {
+    pub fn bind_push_descriptor_image(&mut self, pipeline: &dyn Pipeline, set: u32, image: &impl ImageTrait) {
         self.track(image);
         self.track(pipeline.resource());
 
@@ -296,6 +296,33 @@ impl CommandBuffer {
         }
     }
 
+    pub fn draw(
+        &self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) {
+        unsafe {
+            self.inner.device_dep.device
+                .cmd_draw(self.inner.command_buffer, vertex_count, instance_count, first_vertex, first_instance);
+        }
+    }
+
+    pub fn draw_indexed(
+        &self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
+    ) {
+        unsafe {
+            self.inner.device_dep.device
+                .cmd_draw_indexed(self.inner.command_buffer, index_count, instance_count, first_index, vertex_offset, first_index);
+        }
+    }
+
     pub fn push_constants(&mut self, pipeline: &dyn Pipeline, stage_flags: vk::ShaderStageFlags, offset: u32, data: &[u8]) {
         self.track(pipeline.resource());
 
@@ -319,7 +346,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn clear_color_image_u32<'a>(&mut self, image: &impl Image, layout: ImageLayout, color: [u32; 4])
+    pub fn clear_color_image_u32<'a>(&mut self, image: &impl ImageTrait, layout: ImageLayout, color: [u32; 4])
     {
         self.track(image);
 
@@ -343,7 +370,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn clear_color_image<'a>(&mut self, image: &impl Image, layout: ImageLayout, color: [f32; 4])
+    pub fn clear_color_image<'a>(&mut self, image: &impl ImageTrait, layout: ImageLayout, color: [f32; 4])
     {
         self.track(image);
 
@@ -367,7 +394,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn blit_image<'a>(&mut self, src_image: &impl Image, src_layout: ImageLayout, dst_image: &impl Image, dst_layout: ImageLayout, regions: &[vk::ImageBlit], filter: vk::Filter)
+    pub fn blit_image<'a>(&mut self, src_image: &impl ImageTrait, src_layout: ImageLayout, dst_image: &impl ImageTrait, dst_layout: ImageLayout, regions: &[vk::ImageBlit], filter: vk::Filter)
     {
         self.track(src_image);
         self.track(dst_image);
@@ -416,7 +443,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn copy_buffer_to_image(&mut self, buffer: &Buffer, image: &impl Image, layout: ImageLayout, regions: &[BufferImageCopy])
+    pub fn copy_buffer_to_image(&mut self, buffer: &Buffer, image: &impl ImageTrait, layout: ImageLayout, regions: &[BufferImageCopy])
     {
         self.track(buffer);
         self.track(image);
@@ -433,7 +460,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn copy_image_to_buffer(&mut self, image: &impl Image, layout: ImageLayout, buffer: &Buffer, regions: &[BufferImageCopy]) {
+    pub fn copy_image_to_buffer(&mut self, image: &impl ImageTrait, layout: ImageLayout, buffer: &Buffer, regions: &[BufferImageCopy]) {
         self.track(image);
         self.track(buffer);
 
@@ -449,7 +476,7 @@ impl CommandBuffer {
         }
     }
     
-    pub fn copy_image(&mut self, from: &impl Image, from_layout: ImageLayout, to: &impl Image, to_layout: ImageLayout, regions: &[ImageCopy]) {
+    pub fn copy_image(&mut self, from: &impl ImageTrait, from_layout: ImageLayout, to: &impl ImageTrait, to_layout: ImageLayout, regions: &[ImageCopy]) {
         self.track(from);
         self.track(to);
 

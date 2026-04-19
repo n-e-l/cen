@@ -1,18 +1,18 @@
 use std::sync::{Arc, Mutex};
-use cen::graphics::pipeline_store::{PipelineConfig, PipelineKey};
+use cen::graphics::pipeline_store::{PipelineKey};
 use ash::vk;
-use ash::vk::WriteDescriptorSet;
+use ash::vk::{Extent3D, WriteDescriptorSet};
 use cen::app::Cen;
 use cen::app::app::AppConfig;
 use cen::app::component::{Component, ComponentRegistry};
 use cen::app::engine::InitContext;
-use cen::graphics::DynamicImage;
+use cen::graphics::image_store::ImageKey;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
-use cen::vulkan::{DescriptorSetLayout, Image, ImageConfig};
+use cen::vulkan::{DescriptorSetLayout, ImageTrait, ImageConfig, Image, ComputePipelineConfig};
 
 #[allow(dead_code)]
 struct ComputeRender {
-    image: DynamicImage,
+    image: ImageKey,
     descriptorset: DescriptorSetLayout,
     pipeline: PipelineKey,
 }
@@ -21,15 +21,20 @@ impl ComputeRender {
     pub fn new(ctx: &mut InitContext) -> Self {
 
         // Image
-        let image = DynamicImage::new(
+        let image = ctx.image_store.insert(Image::new(
             &ctx.device,
             &mut ctx.allocator,
-            ImageConfig::default()
-                .width(ctx.swapchain_extent.width)
-                .height(ctx.swapchain_extent.height)
-                .image_usage_flags(vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST)
-        );
-        ctx.register_resizable_image(&image);
+            ImageConfig {
+                extent: Extent3D {
+                    width: ctx.swapchain_extent.width,
+                    height: ctx.swapchain_extent.height,
+                    depth: 1
+                },
+                image_usage_flags: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
+                ..Default::default()
+            }
+        ));
+        ctx.register_resizable_image(image);
 
         // Layout
         let layout_bindings = &[
@@ -45,13 +50,12 @@ impl ComputeRender {
         );
 
         // Pipeline
-        let pipeline = ctx.pipeline_store.insert(PipelineConfig {
-            shader_path: "examples/compute/shader.comp".into(),
+        let pipeline = ctx.pipeline_store.insert(ComputePipelineConfig {
+            shader_source: "examples/compute/shader.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
             ],
-            push_constant_ranges: vec![],
-            macros: Default::default(),
+            ..Default::default()
         }).expect("Failed to create pipeline");
 
         Self {
@@ -65,8 +69,10 @@ impl ComputeRender {
 impl RenderComponent for ComputeRender {
     fn render(&mut self, ctx: &mut RenderContext) {
 
+        let image = ctx.image_store.get(self.image).expect("Image should exist");
+
         ctx.command_buffer.image_barrier(
-            &self.image,
+            image,
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::GENERAL,
             vk::PipelineStageFlags::TOP_OF_PIPE,
@@ -77,9 +83,9 @@ impl RenderComponent for ComputeRender {
 
         // Render
         let compute = ctx.pipeline_store.get(self.pipeline).unwrap();
-        ctx.command_buffer.bind_pipeline(&compute);
+        ctx.command_buffer.bind_pipeline(compute);
 
-        let bindings = [self.image.binding(vk::ImageLayout::GENERAL)];
+        let bindings = [image.binding(vk::ImageLayout::GENERAL)];
 
         let write_descriptor_set = WriteDescriptorSet::default()
             .dst_binding(0)
@@ -88,7 +94,7 @@ impl RenderComponent for ComputeRender {
             .image_info(&bindings);
 
         ctx.command_buffer.bind_push_descriptor(
-            &compute,
+            compute,
             0,
             &[write_descriptor_set]
         );
@@ -96,7 +102,7 @@ impl RenderComponent for ComputeRender {
 
         // Transition the render to a source
         ctx.command_buffer.image_barrier(
-            &self.image,
+            image,
             vk::ImageLayout::GENERAL,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::PipelineStageFlags::COMPUTE_SHADER,
@@ -125,18 +131,18 @@ impl RenderComponent for ComputeRender {
 
         // Use a blit, as a copy doesn't synchronize properly to the swapchain on MoltenVK
         ctx.command_buffer.blit_image(
-            &self.image,
+            image,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             ctx.swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             &[vk::ImageBlit::default()
                 .src_offsets([
                     vk::Offset3D::default(),
-                    vk::Offset3D::default().x(self.image.width() as i32).y(self.image.height() as i32).z(1)
+                    vk::Offset3D::default().x(image.width() as i32).y(image.height() as i32).z(1)
                 ])
                 .dst_offsets([
                     vk::Offset3D::default(),
-                    vk::Offset3D::default().x(self.image.width() as i32).y(self.image.height() as i32).z(1)
+                    vk::Offset3D::default().x(image.width() as i32).y(image.height() as i32).z(1)
                 ])
                 .src_subresource(
                     vk::ImageSubresourceLayers::default()
@@ -169,7 +175,7 @@ impl RenderComponent for ComputeRender {
 
         // Transition the render image back
         ctx.command_buffer.image_barrier(
-            &self.image,
+            image,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             vk::ImageLayout::GENERAL,
             vk::PipelineStageFlags::TRANSFER,

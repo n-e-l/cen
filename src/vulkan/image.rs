@@ -1,7 +1,8 @@
 use std::any::Any;
 use std::sync::{Arc, Mutex};
 use ash::vk;
-use ash::vk::{ComponentMapping, DescriptorImageInfo, Extent2D, ImageAspectFlags, ImageLayout, ImageView, Sampler};
+use ash::vk::{ComponentMapping, DescriptorImageInfo, Extent2D, Filter, ImageAspectFlags, ImageLayout, ImageView, Sampler};
+use derive_builder::Builder;
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationScheme};
 use log::{trace};
@@ -12,15 +13,16 @@ use crate::vulkan::memory::GpuResource;
 
 #[derive(Copy, Clone)]
 pub struct ImageConfig {
-    extent: vk::Extent3D,
-    samples: vk::SampleCountFlags,
-    image_usage_flags: vk::ImageUsageFlags,
-    sharing_mode: vk::SharingMode,
-    initial_layout: vk::ImageLayout,
-    array_layers: u32,
-    mip_levels: u32,
-    image_type: vk::ImageType,
-    format: vk::Format,
+    pub extent: vk::Extent3D,
+    pub samples: vk::SampleCountFlags,
+    pub image_usage_flags: vk::ImageUsageFlags,
+    pub sharing_mode: vk::SharingMode,
+    pub initial_layout: vk::ImageLayout,
+    pub array_layers: u32,
+    pub mip_levels: u32,
+    pub image_type: vk::ImageType,
+    pub format: vk::Format,
+    pub filter: vk::Filter
 }
 
 impl Default for ImageConfig {
@@ -35,68 +37,12 @@ impl Default for ImageConfig {
             mip_levels: 1,
             image_type: vk::ImageType::TYPE_2D,
             format: vk::Format::R8G8B8A8_UNORM,
+            filter: vk::Filter::NEAREST
         }
     }
 }
 
-impl ImageConfig {
-    pub fn extent(mut self, extent: vk::Extent3D) -> Self {
-        self.extent = extent;
-        self
-    }
-
-    pub fn width(mut self, width: u32) -> Self {
-        self.extent.width = width;
-        self
-    }
-
-    pub fn height(mut self, height: u32) -> Self {
-        self.extent.height = height;
-        self
-    }
-
-    pub fn samples(mut self, samples: vk::SampleCountFlags) -> Self {
-        self.samples = samples;
-        self
-    }
-
-    pub fn image_usage_flags(mut self, image_usage_flags: vk::ImageUsageFlags) -> Self {
-        self.image_usage_flags = image_usage_flags;
-        self
-    }
-
-    pub fn sharing_mode(mut self, sharing_mode: vk::SharingMode) -> Self {
-        self.sharing_mode = sharing_mode;
-        self
-    }
-
-    pub fn initial_layout(mut self, initial_layout: vk::ImageLayout) -> Self {
-        self.initial_layout = initial_layout;
-        self
-    }
-
-    pub fn array_layers(mut self, array_layers: u32) -> Self {
-        self.array_layers = array_layers;
-        self
-    }
-
-    pub fn mip_levels(mut self, mip_levels: u32) -> Self {
-        self.mip_levels = mip_levels;
-        self
-    }
-
-    pub fn image_type(mut self, image_type: vk::ImageType) -> Self {
-        self.image_type = image_type;
-        self
-    }
-
-    pub fn format(mut self, format: vk::Format) -> Self {
-        self.format = format;
-        self
-    }
-}
-
-pub trait Image: GpuResource {
+pub trait ImageTrait: GpuResource {
     fn handle(&self) -> vk::Image;
     fn image_view(&self) -> vk::ImageView;
     fn sampler(&self) -> vk::Sampler;
@@ -108,7 +54,7 @@ pub trait Image: GpuResource {
     fn binding(&self, layout: vk::ImageLayout) -> vk::DescriptorImageInfo;
 }
 
-struct OwnedImageInner {
+struct ImageInner {
     pub device_dep: Arc<DeviceInner>,
     pub allocator_dep: Option<Arc<Mutex<AllocatorInner>>>,
     pub(crate) image: vk::Image,
@@ -126,8 +72,8 @@ struct SwapchainImageInner {
     extent: vk::Extent2D,
 }
 
-pub struct OwnedImage {
-    inner: Arc<OwnedImageInner>
+pub struct Image {
+    inner: Arc<ImageInner>
 }
 
 pub struct SwapchainImage {
@@ -144,7 +90,7 @@ impl Drop for SwapchainImageInner {
     }
 }
 
-impl Drop for OwnedImageInner {
+impl Drop for ImageInner {
     fn drop(&mut self) {
         unsafe {
             let image_addr = format!("{:?}", self.image);
@@ -163,7 +109,7 @@ impl Drop for OwnedImageInner {
     }
 }
 
-impl GpuResource for OwnedImage {
+impl GpuResource for Image {
     fn reference(&self) -> Arc<dyn Any> {
         self.inner.clone()
     }
@@ -222,7 +168,7 @@ impl SwapchainImage {
     }
 }
 
-impl OwnedImage {
+impl Image {
 
     pub fn new(device: &Device, allocator: &mut Allocator, config: ImageConfig) -> Self {
 
@@ -282,7 +228,9 @@ impl OwnedImage {
         };
 
         // Sampler
-        let sampler_create_info = vk::SamplerCreateInfo::default();
+        let sampler_create_info = vk::SamplerCreateInfo::default()
+            .mag_filter(config.filter)
+            .min_filter(config.filter);
         let sampler = unsafe {
             device.handle().create_sampler(&sampler_create_info, None)
                 .expect("Failed to create sampler")
@@ -291,7 +239,7 @@ impl OwnedImage {
         trace!(target: LOG_TARGET, "Created image: [{:?}]", image);
 
         Self {
-            inner: Arc::new(OwnedImageInner {
+            inner: Arc::new(ImageInner {
                 image,
                 image_view,
                 sampler,
@@ -308,7 +256,7 @@ impl OwnedImage {
     }
 }
 
-impl Image for OwnedImage {
+impl ImageTrait for Image {
     fn handle(&self) -> vk::Image {
         self.inner.image
     }
@@ -337,7 +285,7 @@ impl Image for OwnedImage {
     }
 }
 
-impl Image for SwapchainImage {
+impl ImageTrait for SwapchainImage {
     fn handle(&self) -> vk::Image {
         self.inner.image
     }

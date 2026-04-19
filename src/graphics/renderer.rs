@@ -2,19 +2,20 @@ use std::sync::{Arc, Mutex};
 use log::{info};
 use std::time::Instant;
 use ash::vk;
-use ash::vk::{Extent2D, ImageLayout, PhysicalDevice, Queue};
+use ash::vk::{Extent2D, Extent3D, ImageLayout, PhysicalDevice, Queue};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
 use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
+use crate::graphics::image_store::{ImageKey, ImageStore};
 use crate::graphics::pipeline_store::PipelineStore;
-use crate::graphics::WeakDynamicImage;
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain, SwapchainImage};
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, ImageConfig, Instance, Surface, Swapchain, SwapchainImage};
 
 pub struct RenderContext<'a> {
     pub device: &'a Device,
     pub allocator: &'a mut Allocator,
     pub pipeline_store: &'a mut PipelineStore,
+    pub image_store: &'a mut ImageStore,
     pub command_buffer: &'a mut CommandBuffer,
     pub swapchain_image: &'a SwapchainImage,
     pub queue: &'a Queue,
@@ -33,8 +34,9 @@ pub trait RenderComponent {
 }
 
 pub struct Renderer {
-    resizable_images: Vec<WeakDynamicImage>,
-    pub(crate) pipeline_store: PipelineStore,
+    dynamic_images: Vec<ImageKey>,
+    pub pipeline_store: PipelineStore,
+    pub image_store: ImageStore,
     pub render_finished_semaphores: Vec<vk::Semaphore>,
     pub image_available_semaphores: Vec<vk::Semaphore>,
     pub command_buffers: Vec<CommandBuffer>,
@@ -112,6 +114,7 @@ impl Renderer {
         }).collect::<Vec<Vec<Box<dyn FnOnce()>>>>();
 
         let pipeline_store = PipelineStore::new( &device, proxy );
+        let image_store = ImageStore::default();
 
         let start_time = std::time::Instant::now();
 
@@ -130,33 +133,44 @@ impl Renderer {
             command_buffers,
             on_finish_functions,
             pipeline_store,
+            image_store,
             frame_index: 0,
             start_time,
             present_mode,
-            resizable_images: Vec::new()
+            dynamic_images: Vec::new()
         }
     }
 
-    pub fn register_dynamic_image(&mut self, dynamic_image: &WeakDynamicImage) {
-        self.resizable_images.push(dynamic_image.clone());
+    pub fn register_dynamic_image(&mut self, image: ImageKey) {
+        self.dynamic_images.push(image);
     }
 
     pub(crate) fn on_window_recreation(&mut self, window_state: WindowState) {
+
         self.device.wait_idle();
         info!("Recreating swapchain");
         self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
 
         // Update all subscribed images with the new resolution
         let mut update_count = 0;
-        self.resizable_images.retain_mut(|weak| {
-           match weak.upgrade() {
-               Some(mut image) => {
-                   update_count += 1;
-                   image.resize( &self.device, &mut self.allocator, window_state.extent2d.width, window_state.extent2d.height);
-                   true
-               }
-               None => false
-           }
+        // retain, in order to remove invalid keys
+        self.dynamic_images.retain_mut(|key| {
+            match self.image_store.recreate(&self.device, &mut self.allocator, *key, |config| {
+                ImageConfig {
+                    extent: Extent3D {
+                        width: window_state.extent2d.width,
+                        height: window_state.extent2d.height,
+                        depth: 1
+                    },
+                    ..config
+                }
+            }) {
+                Ok(_) => {
+                    update_count += 1;
+                    true
+                }
+                Err(_) => { false }
+            }
         });
 
         info!("Recreated {update_count} images with resolution {} {}", window_state.extent2d.width, window_state.extent2d.height);
@@ -195,6 +209,7 @@ impl Renderer {
             device: &self.device,
             allocator: &mut self.allocator,
             pipeline_store: &mut self.pipeline_store,
+            image_store: &mut self.image_store,
             command_buffer: &mut command_buffer,
             swapchain_image,
             queue: &self.queue,

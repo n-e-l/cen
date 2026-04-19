@@ -4,11 +4,24 @@ use std::ffi::CString;
 use std::path::PathBuf;
 use std::sync::Arc;
 use ash::vk;
+use ash::vk::{PushConstantRange, SampleCountFlags};
 use log::trace;
-use crate::vulkan::{DescriptorSetLayout, Device, GpuHandle, Pipeline, RenderPass, LOG_TARGET};
+use crate::vulkan::{DescriptorSetLayout, Device, GpuHandle, Pipeline, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
 use crate::vulkan::memory::GpuResource;
 use crate::vulkan::pipeline::{create_shader_module, load_shader_code, PipelineErr};
+
+#[derive(Clone)]
+pub struct GraphicsPipelineConfig {
+    pub color_formats: Vec<vk::Format>,
+    pub depth_format: Option<vk::Format>,
+    pub sample_count: SampleCountFlags,
+    pub vertex_shader_source: PathBuf,
+    pub fragment_shader_source: PathBuf,
+    pub descriptor_set_layouts: Vec<DescriptorSetLayout>,
+    pub push_constant_ranges: Vec<PushConstantRange>,
+    pub macros: HashMap<String, String>
+}
 
 pub struct GraphicsPipelineInner {
     pub pipeline_layout: vk::PipelineLayout,
@@ -29,6 +42,7 @@ impl Drop for GraphicsPipelineInner {
 
 impl GpuHandle for GraphicsPipelineInner {}
 
+#[derive(Clone)]
 pub struct GraphicsPipeline {
     inner: Arc<GraphicsPipelineInner>
 }
@@ -59,12 +73,20 @@ impl GpuResource for GraphicsPipeline {
 
 impl GraphicsPipeline {
 
-    pub fn new(device: &Device, render_pass: &RenderPass, vertex_shader_source: PathBuf, fragment_shader_source: PathBuf, layouts: &[&DescriptorSetLayout], macros: HashMap<String, String>) -> Result<Self, PipelineErr> {
+    pub fn new(
+        device: &Device,
+        config: GraphicsPipelineConfig
+    ) -> Result<Self, PipelineErr> {
 
-        let vertex_shader_code = load_shader_code(vertex_shader_source, &macros)?;
-        let fragment_shader_code = load_shader_code(fragment_shader_source, &macros)?;
+        // Dynamic rendering
+        let mut pipeline_rendering_create_info = vk::PipelineRenderingCreateInfo::default()
+            .color_attachment_formats(&config.color_formats)
+            .depth_attachment_format(config.depth_format.unwrap_or(vk::Format::UNDEFINED));
 
         // Shaders
+        let vertex_shader_code = load_shader_code(config.vertex_shader_source, &config.macros)?;
+        let fragment_shader_code = load_shader_code(config.fragment_shader_source, &config.macros)?;
+
         let vertex_shader_module = create_shader_module(device.handle(), vertex_shader_code.to_vec());
         let fragment_shader_module = create_shader_module(device.handle(), fragment_shader_code.to_vec());
 
@@ -84,7 +106,7 @@ impl GraphicsPipeline {
 
         // Multisample
         let multisample_state_create_info = vk::PipelineMultisampleStateCreateInfo::default()
-            .rasterization_samples(vk::SampleCountFlags::TYPE_1);
+            .rasterization_samples(config.sample_count);
 
         // Viewport
         let viewports = [vk::Viewport::default()
@@ -120,10 +142,10 @@ impl GraphicsPipeline {
 
         // Color blending
         let color_blend_attachment_state = vk::PipelineColorBlendAttachmentState::default()
-            .blend_enable(false)
+            .blend_enable(true)
             .color_write_mask(vk::ColorComponentFlags::RGBA)
-            .src_color_blend_factor(vk::BlendFactor::ONE)
-            .dst_color_blend_factor(vk::BlendFactor::ZERO)
+            .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
             .color_blend_op(vk::BlendOp::ADD)
             .src_alpha_blend_factor(vk::BlendFactor::ONE)
             .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
@@ -148,9 +170,10 @@ impl GraphicsPipeline {
             .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]);
 
         // Layout
-        let desc_layouts = layouts
+        let desc_layouts = config.descriptor_set_layouts
             .iter().map(|layout| layout.handle()).collect::<Vec<_>>();
         let create_info = vk::PipelineLayoutCreateInfo::default()
+            .push_constant_ranges(&config.push_constant_ranges)
             .set_layouts(&desc_layouts);
         let pipeline_layout = unsafe {
             device.handle()
@@ -161,7 +184,7 @@ impl GraphicsPipeline {
         // pipeline
         let graphics_pipeline_create_info = vk::GraphicsPipelineCreateInfo::default()
             .stages(&shader_stages)
-            .render_pass(render_pass.handle())
+            .push_next(&mut pipeline_rendering_create_info)
             .multisample_state(&multisample_state_create_info)
             .viewport_state(&viewport_state_create_info)
             .vertex_input_state(&vertex_input_state_create_info)
