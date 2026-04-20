@@ -6,3 +6,4 @@ pub mod component;
 
 pub use self::app::Cen;
 pub use self::window::Window;
+pub use self::gui::Texture;

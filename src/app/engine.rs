@@ -186,6 +186,7 @@ impl Engine {
         
         // Update our gui. Has to happen each frame or we will miss frames
         self.gui_system.lock().unwrap().update(
+            &mut self.renderer.allocator,
             self.window.winit_window(),
             self.registry.gui_components().as_mut_slice()
         );
@@ -194,6 +195,7 @@ impl Engine {
         let mut draw_components = self.registry.render_components();
         // Add our gui system to our render components
         draw_components.push(self.gui_system.clone());
+
         self.renderer.draw_frame(
             draw_components.as_slice()
         );
