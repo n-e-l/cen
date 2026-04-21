@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.11](https://github.com/n-e-l/cen/compare/v0.0.10...v0.0.11) - 2026-04-21
+
+### Other
+
+- Simplify the component registry and remove Arc Mutexes
+- Update Vulkan SDK action version to v1.4.0
+- Actions version
+- Add texture lifetime management
+- Fix warnings
+- Too big of a commit, remove dynamic images for ImageTraits, consolidate pipeline configs, remove mutex from pipeline_store
+- Clean up pipeline store, as it doesn't need an Arc
+- Don't use 'q' for exiting
+- Proper swapchain barriers
+- Always render with the swapchain format
+- Add title option
+- Ease of use fixes
+- Move struct definition together
+- Fix warnings
+- More cleanup
+- Cleanup
+- Add initial support for dynamic images
+- Use correct egui_dock version
+- Add egui_dock
+- Disable tracing::span logs
+- Add pipeline update functionality
+- Add support for shader includes
+- Update egui to 0.32.2
+- Merge pull request #24 from n-e-l/release-plz-2025-10-17T20-19-07Z
+- Add guihandler and fix shaderc flake
+
 ## [0.0.10](https://github.com/n-e-l/cen/compare/v0.0.9...v0.0.10) - 2025-10-17
 
 ### Other
