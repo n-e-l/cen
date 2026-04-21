@@ -1,19 +1,19 @@
-use std::sync::{Arc, Mutex};
 use ash::vk;
 use ash::vk::{BufferImageCopy, BufferUsageFlags, DeviceSize, Extent3D, ImageLayout, ImageSubresourceLayers};
+use egui::Context;
 use gpu_allocator::MemoryLocation;
 use cen::app::Cen;
-use cen::app::app::AppConfig;
-use cen::app::component::{Component, ComponentRegistry};
+use cen::app::app::{AppComponent, AppConfig};
 use cen::app::engine::InitContext;
+use cen::app::gui::{GuiComponent, GuiHandler};
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{Buffer, ImageTrait};
 
-struct ComputeRender {
+struct BufferExample {
     buffer: Buffer,
 }
 
-impl ComputeRender {
+impl AppComponent for BufferExample {
     fn new(ctx: &mut InitContext) -> Self {
         // Image
         let buffer = Buffer::new(
@@ -37,7 +37,7 @@ impl ComputeRender {
     }
 }
 
-impl RenderComponent for ComputeRender {
+impl RenderComponent for BufferExample {
 
     fn render(&mut self, ctx: &mut RenderContext) {
 
@@ -116,15 +116,11 @@ impl RenderComponent for ComputeRender {
     }
 }
 
-fn main() {
+impl GuiComponent for BufferExample {
+    fn gui(&mut self, _: &mut GuiHandler, _: &Context) {}
+}
 
-    Cen::run(
-        AppConfig::default(),
-        Box::new(|ctx| {
-            let compute = Arc::new(Mutex::new(ComputeRender::new(ctx)));
-            ComponentRegistry::new()
-                .register(Component::Render(compute))
-        })
-    );
+fn main() {
+    Cen::<BufferExample>::run(AppConfig::default());
 }
 

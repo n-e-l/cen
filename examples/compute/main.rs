@@ -1,25 +1,25 @@
-use std::sync::{Arc, Mutex};
 use cen::graphics::pipeline_store::{PipelineKey};
 use ash::vk;
 use ash::vk::{Extent3D, WriteDescriptorSet};
+use egui::Context;
 use cen::app::Cen;
-use cen::app::app::AppConfig;
-use cen::app::component::{Component, ComponentRegistry};
+use cen::app::app::{AppComponent, AppConfig};
 use cen::app::engine::InitContext;
+use cen::app::gui::{GuiComponent, GuiHandler};
 use cen::graphics::image_store::ImageKey;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{DescriptorSetLayout, ImageTrait, ImageConfig, Image, ComputePipelineConfig};
 
-#[allow(dead_code)]
-struct ComputeRender {
+struct ComputeExample {
     image: ImageKey,
-    descriptorset: DescriptorSetLayout,
+    _descriptorset: DescriptorSetLayout,
     pipeline: PipelineKey,
 }
 
-impl ComputeRender {
-    pub fn new(ctx: &mut InitContext) -> Self {
-
+impl AppComponent for ComputeExample {
+    fn new(ctx: &mut InitContext) -> Self
+    where Self: Sized
+    {
         // Image
         let image = ctx.image_store.insert(Image::new(
             &ctx.device,
@@ -61,12 +61,12 @@ impl ComputeRender {
         Self {
             image,
             pipeline,
-            descriptorset
+            _descriptorset: descriptorset
         }
     }
 }
 
-impl RenderComponent for ComputeRender {
+impl RenderComponent for ComputeExample {
     fn render(&mut self, ctx: &mut RenderContext) {
 
         let image = ctx.image_store.get(self.image).expect("Image should exist");
@@ -187,13 +187,10 @@ impl RenderComponent for ComputeRender {
     }
 }
 
+impl GuiComponent for ComputeExample {
+    fn gui(&mut self, _: &mut GuiHandler, _: &Context) {}
+}
+
 fn main() {
-    Cen::run(
-        AppConfig::default(),
-        Box::new(|ctx| {
-            let compute = Arc::new(Mutex::new(ComputeRender::new(ctx)));
-            ComponentRegistry::new()
-                .register(Component::Render(compute))
-        })
-    );
+    Cen::<ComputeExample>::run(AppConfig::default());
 }

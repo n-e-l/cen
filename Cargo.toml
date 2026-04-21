@@ -33,9 +33,6 @@ egui_extras = { version = "0.33.2", features = ["all_loaders"] }
 [dev-dependencies]
 
 [[example]]
-name = "empty"
-
-[[example]]
 name = "compute"
 
 [[example]]

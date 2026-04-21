@@ -13,7 +13,14 @@ use egui_winit::State;
 use log::{error, trace};
 use std::any::Any;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
+use slotmap::{new_key_type, SlotMap};
+
+pub trait Widget: GuiComponent + RenderComponent
+{}
+
+new_key_type! { pub struct WidgetKey; }
+pub type WidgetStore = SlotMap<WidgetKey, Box<dyn Widget>>;
 
 #[derive(Clone)]
 pub struct Texture {
@@ -161,7 +168,7 @@ impl GuiSystem {
         let _ = self.egui_winit.on_window_event(window, event);
     }
 
-    pub fn update(&mut self, allocator: &mut Allocator, window: &winit::window::Window, components: &mut [Arc<Mutex<dyn GuiComponent>>]) {
+    pub fn update(&mut self, allocator: &mut Allocator, window: &winit::window::Window, components: &mut [&mut dyn GuiComponent]) {
 
         // Remove unused images
         self.textures.retain(|id, (texture, set, _)| {
@@ -192,7 +199,7 @@ impl GuiSystem {
         let raw_input = self.egui_winit.take_egui_input(window);
         self.egui_output = Some(self.egui_ctx.run(raw_input, |ctx| {
             for component in &mut *components {
-                component.lock().unwrap().gui(&mut handler, ctx);
+                component.gui(&mut handler, ctx);
             }
         }));
     }

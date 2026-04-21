@@ -1,18 +1,16 @@
-use std::sync::{Arc, Mutex};
 use cen::graphics::pipeline_store::{PipelineKey};
 use ash::vk;
 use ash::vk::{Extent3D, WriteDescriptorSet};
 use egui::Context;
-use cen::app::app::{AppConfig, Cen};
+use cen::app::app::{AppComponent, AppConfig, Cen};
 use cen::app::gui::{GuiComponent, GuiHandler};
-use cen::app::component::{Component, ComponentRegistry};
 use cen::app::engine::InitContext;
 use cen::graphics::image_store::ImageKey;
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{DescriptorSetLayout, ImageTrait, ImageConfig, Image, ComputePipelineConfig};
 
 #[allow(dead_code)]
-struct ComputeRender {
+struct EguiExample {
     image: ImageKey,
     descriptorset: DescriptorSetLayout,
     pipeline_a: PipelineKey,
@@ -20,7 +18,7 @@ struct ComputeRender {
     pressed: bool,
 }
 
-impl ComputeRender {
+impl AppComponent for EguiExample {
     fn new(ctx: &mut InitContext) -> Self {
 
         // Image, we're using the image store in order to get automatic swapchain resizable images
@@ -82,7 +80,7 @@ impl ComputeRender {
 
 }
 
-impl RenderComponent for ComputeRender {
+impl RenderComponent for EguiExample {
     fn render(&mut self, ctx: &mut RenderContext) {
 
         let image = ctx.image_store.get(self.image).expect("Image should exist");
@@ -209,7 +207,7 @@ impl RenderComponent for ComputeRender {
     }
 }
 
-impl GuiComponent for ComputeRender {
+impl GuiComponent for EguiExample {
     fn gui(&mut self, _: &mut GuiHandler, ctx: &Context) {
         egui::Window::new("Shader controls")
             .resizable(true)
@@ -222,15 +220,8 @@ impl GuiComponent for ComputeRender {
 }
 
 fn main() {
-
-    Cen::run(
+    Cen::<EguiExample>::run(
         AppConfig::default()
-            .resizable(true),
-        Box::new(|ctx| {
-            let compute = Arc::new(Mutex::new(ComputeRender::new(ctx)));
-            ComponentRegistry::new()
-                .register(Component::Render(compute.clone()))
-                .register(Component::Gui(compute.clone()))
-        })
+              .resizable(true)
     );
 }

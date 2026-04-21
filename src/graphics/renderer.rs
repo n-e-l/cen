@@ -1,4 +1,3 @@
-use std::sync::{Arc, Mutex};
 use log::{info};
 use std::time::Instant;
 use ash::vk;
@@ -176,7 +175,7 @@ impl Renderer {
         info!("Recreated {update_count} images with resolution {} {}", window_state.extent2d.width, window_state.extent2d.height);
     }
 
-    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &[Arc<Mutex<dyn RenderComponent>>]) {
+    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &mut [&mut dyn RenderComponent]) {
 
         let mut command_buffer = self.command_buffers[frame_index].clone();
 
@@ -217,14 +216,14 @@ impl Renderer {
             on_finish: &mut self.on_finish_functions[frame_index]
         };
 
-        for rc in render_components.iter() {
-            rc.lock().unwrap().render( &mut ctx );
+        for rc in render_components.iter_mut() {
+            rc.render( &mut ctx );
         }
 
         command_buffer.end();
     }
 
-    pub fn draw_frame(&mut self, render_components: &[Arc<Mutex<dyn RenderComponent>>]) {
+    pub fn draw_frame(&mut self, render_components: &mut [&mut dyn RenderComponent]) {
 
         // Wait for the current frame's command buffer to finish executing.
         let fence = self.command_buffers[self.frame_index].fence();

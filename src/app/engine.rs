@@ -1,17 +1,16 @@
-use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use ash::vk::{Extent2D, Queue};
 use log::{debug, error, info};
+use slotmap::SlotMap;
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
-use crate::app::app::{AppConfig, UserEvent};
-use crate::app::gui::{GuiSystem};
-use crate::app::component::{ComponentRegistry};
+use crate::app::app::{AppComponent, AppConfig, UserEvent};
+use crate::app::gui::{GuiComponent, GuiSystem, Widget, WidgetKey, WidgetStore};
 use crate::app::Window;
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::graphics::{Renderer};
 use crate::graphics::image_store::{ImageKey, ImageStore};
-use crate::graphics::renderer::{WindowState};
+use crate::graphics::renderer::{RenderComponent, WindowState};
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device};
 
 /**
@@ -21,12 +20,13 @@ use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device};
 pub struct Engine {
     _start_time: SystemTime,
     window: Box<Window>,
-    gui_system: Arc<Mutex<GuiSystem>>,
+    gui_system: GuiSystem,
     renderer: Renderer,
+    widget_store: SlotMap<WidgetKey, Box<dyn Widget>>,
     frame_count: usize,
     last_print_time: SystemTime,
     log_fps: bool,
-    pub registry: ComponentRegistry,
+    app_component: Box<dyn AppComponent>
 }
 
 pub struct InitContext<'a> {
@@ -39,6 +39,7 @@ pub struct InitContext<'a> {
     pub swapchain_extent: Extent2D,
     pub queue: &'a Queue,
     pub command_pool: &'a CommandPool,
+    widget_store: &'a mut WidgetStore,
     resizable_images: Vec<ImageKey>
 }
 
@@ -46,13 +47,15 @@ impl InitContext<'_> {
     pub fn register_resizable_image(&mut self, image: ImageKey) {
         self.resizable_images.push(image)
     }
-}
 
-pub type InitCallback = Box<dyn FnOnce(&mut InitContext) -> ComponentRegistry>;
+    pub fn add_widget(&mut self, widget: impl Widget + 'static) -> WidgetKey {
+        self.widget_store.insert(Box::new(widget))
+    }
+}
 
 impl Engine {
 
-    pub fn new(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig, init_callback: InitCallback) -> Engine {
+    pub fn new<C: AppComponent + 'static>(proxy: EventLoopProxy<UserEvent>, event_loop: &ActiveEventLoop, app_config: &AppConfig) -> Engine {
 
         // Create the graphics context
         let window = Box::new(Window::create(event_loop, &app_config.title, app_config.width, app_config.height, app_config.fullscreen, app_config.resizable));
@@ -69,6 +72,8 @@ impl Engine {
         // Setup gui
         let mut gui_system = GuiSystem::new(window.as_ref(), &mut renderer);
 
+        let mut widget_store = WidgetStore::default();
+
         // Initialize the user components
         let mut command_buffer = renderer.create_command_buffer();
         command_buffer.begin();
@@ -82,9 +87,10 @@ impl Engine {
             swapchain_extent: renderer.swapchain.get_extent(),
             queue: &renderer.queue,
             command_pool: &renderer.command_pool,
+            widget_store: &mut widget_store,
             resizable_images: Vec::new()
         };
-        let registry: ComponentRegistry = init_callback(&mut init_context);
+        let app_component = Box::new(C::new(&mut init_context));
 
         // Pass the resizable images to the renderer
         init_context.resizable_images.iter().for_each(|i| {
@@ -98,11 +104,12 @@ impl Engine {
             _start_time: SystemTime::now(),
             window,
             renderer,
-            gui_system: Arc::new(Mutex::new(gui_system)),
+            gui_system,
             frame_count: 0,
+            app_component,
             last_print_time: SystemTime::now(),
-            registry,
             log_fps: app_config.log_fps,
+            widget_store: Default::default()
         }
     }
 
@@ -115,7 +122,7 @@ impl Engine {
     pub(crate) fn window_event(&mut self, event_loop: &ActiveEventLoop, event: WindowEvent) {
         self.window.window_event( event.clone(), event_loop );
 
-        self.gui_system.lock().unwrap().on_window_event(self.window.winit_window(), &event);
+        self.gui_system.on_window_event(self.window.winit_window(), &event);
 
         match event {
             WindowEvent::RedrawRequested => {
@@ -185,19 +192,24 @@ impl Engine {
     pub fn draw(&mut self) {
         
         // Update our gui. Has to happen each frame or we will miss frames
-        self.gui_system.lock().unwrap().update(
+        let mut gui_components = self.widget_store.values_mut()
+            .map(|w| w.as_mut() as &mut dyn GuiComponent )
+            .collect::<Vec<_>>();
+        gui_components.push(self.app_component.as_mut());
+        self.gui_system.update(
             &mut self.renderer.allocator,
             self.window.winit_window(),
-            self.registry.gui_components().as_mut_slice()
+            &mut gui_components
         );
 
         // Render all our components
-        let mut draw_components = self.registry.render_components();
         // Add our gui system to our render components
-        draw_components.push(self.gui_system.clone());
+        let mut render_components = self.widget_store.values_mut()
+            .map(|w| w.as_mut() as &mut dyn RenderComponent)
+            .collect::<Vec<_>>();
+        render_components.push(self.app_component.as_mut());
+        render_components.push(&mut self.gui_system);
 
-        self.renderer.draw_frame(
-            draw_components.as_slice()
-        );
+        self.renderer.draw_frame(&mut render_components);
     }
 }

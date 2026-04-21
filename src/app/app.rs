@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use winit::application::ApplicationHandler;
 use std::path::{PathBuf};
 use env_logger::{Builder, Env};
@@ -5,20 +6,21 @@ use log::{LevelFilter};
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::window::WindowId;
-use crate::app::engine::{Engine, InitCallback};
+use crate::app::engine::{Engine, InitContext};
+use crate::app::gui::{GuiComponent};
+use crate::graphics::renderer::{RenderComponent};
 
 /**
  * Entrypoint of a cen application.
  * Listens to and passes eventloop events to the engine.
  */
-pub struct Cen
+pub struct Cen<C: AppComponent>
 {
     pub proxy: EventLoopProxy<UserEvent>,
     pub app_config: AppConfig,
     engine: Option<Engine>,
-    pub init_callback: Option<InitCallback>,
+    _marker: PhantomData<C>
 }
-
 
 pub struct AppConfig {
     pub(crate) width: u32,
@@ -78,7 +80,10 @@ impl AppConfig {
         self.title = title.to_string();
         self
     }
+}
 
+pub trait AppComponent : RenderComponent + GuiComponent {
+    fn new(ctx: &mut InitContext) -> Self where Self: Sized;
 }
 
 #[derive(Debug, Default)]
@@ -88,7 +93,7 @@ pub enum UserEvent {
     GlslUpdate(PathBuf),
 }
 
-impl ApplicationHandler<UserEvent> for Cen
+impl<C: AppComponent + 'static> ApplicationHandler<UserEvent> for Cen<C>
 {
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         if let Some(ref mut engine) = self.engine {
@@ -100,11 +105,10 @@ impl ApplicationHandler<UserEvent> for Cen
 
         // Prepare for multiple resume calls
         if let None = self.engine {
-            self.engine = Some(Engine::new(
+            self.engine = Some(Engine::new::<C>(
                 self.proxy.clone(),
                 event_loop,
-                &self.app_config,
-                self.init_callback.take().unwrap()
+                &self.app_config
             ));
         }
 
@@ -141,7 +145,7 @@ impl ApplicationHandler<UserEvent> for Cen
     }
 }
 
-impl Cen {
+impl<C: AppComponent + 'static> Cen<C> {
 
     fn init_logger() {
         let env = Env::default()
@@ -163,19 +167,19 @@ impl Cen {
             .init();
     }
 
-    fn new(app_config: AppConfig, event_loop: &EventLoop<UserEvent>, init_callback: InitCallback) -> Self {
+    fn new(app_config: AppConfig, event_loop: &EventLoop<UserEvent>) -> Self {
 
         let proxy = event_loop.create_proxy();
 
-        Cen {
+        Cen::<C> {
             app_config,
             proxy,
-            init_callback: Some(init_callback),
             engine: None,
+            _marker: Default::default(),
         }
     }
 
-    pub fn run(app_config: AppConfig, init_callback: InitCallback) {
+    pub fn run(app_config: AppConfig) {
 
         Self::init_logger();
 
@@ -183,7 +187,7 @@ impl Cen {
         event_loop.set_control_flow(ControlFlow::Poll);
 
         // App setup
-        let mut app = Cen::new(app_config, &event_loop, init_callback);
+        let mut app: Cen<C> = Cen::<C>::new(app_config, &event_loop);
         event_loop.run_app(&mut app).unwrap();
     }
 
