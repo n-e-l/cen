@@ -2,6 +2,7 @@ use ash::vk;
 use ash::vk::{BufferImageCopy, BufferUsageFlags, DeviceSize, Extent3D, ImageLayout, ImageSubresourceLayers};
 use egui::Context;
 use gpu_allocator::MemoryLocation;
+use winit::event::WindowEvent;
 use cen::app::Cen;
 use cen::app::app::{AppComponent, AppConfig};
 use cen::app::engine::InitContext;
@@ -34,6 +35,9 @@ impl AppComponent for BufferExample {
         Self {
             buffer
         }
+    }
+
+    fn window_event(&mut self, _: WindowEvent) {
     }
 }
 

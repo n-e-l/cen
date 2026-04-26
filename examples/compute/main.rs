@@ -2,11 +2,12 @@ use cen::graphics::pipeline_store::{PipelineKey};
 use ash::vk;
 use ash::vk::{Extent3D, WriteDescriptorSet};
 use egui::Context;
+use winit::event::WindowEvent;
 use cen::app::Cen;
 use cen::app::app::{AppComponent, AppConfig};
 use cen::app::engine::InitContext;
 use cen::app::gui::{GuiComponent, GuiHandler};
-use cen::graphics::image_store::ImageKey;
+use cen::graphics::image_store::{ImageFlags, ImageKey};
 use cen::graphics::renderer::{RenderComponent, RenderContext};
 use cen::vulkan::{DescriptorSetLayout, ImageTrait, ImageConfig, Image, ComputePipelineConfig};
 
@@ -21,20 +22,22 @@ impl AppComponent for ComputeExample {
     where Self: Sized
     {
         // Image
-        let image = ctx.image_store.insert(Image::new(
-            &ctx.device,
-            &mut ctx.allocator,
-            ImageConfig {
-                extent: Extent3D {
-                    width: ctx.swapchain_extent.width,
-                    height: ctx.swapchain_extent.height,
-                    depth: 1
-                },
-                image_usage_flags: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
-                ..Default::default()
-            }
-        ));
-        ctx.register_resizable_image(image);
+        let image = ctx.image_store.insert_with_flags(
+            ImageFlags::MATCH_SWAPCHAIN_EXTENT,
+            Image::new(
+                &ctx.device,
+                &mut ctx.allocator,
+                ImageConfig {
+                    extent: Extent3D {
+                        width: ctx.swapchain_extent.width,
+                        height: ctx.swapchain_extent.height,
+                        depth: 1
+                    },
+                    image_usage_flags: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
+                    ..Default::default()
+                }
+            )
+        );
 
         // Layout
         let layout_bindings = &[
@@ -63,6 +66,9 @@ impl AppComponent for ComputeExample {
             pipeline,
             _descriptorset: descriptorset
         }
+    }
+
+    fn window_event(&mut self, _: WindowEvent) {
     }
 }
 

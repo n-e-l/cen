@@ -15,12 +15,15 @@ pub struct ImageConfig {
     pub extent: vk::Extent3D,
     pub samples: vk::SampleCountFlags,
     pub image_usage_flags: vk::ImageUsageFlags,
+    pub image_create_flags: vk::ImageCreateFlags,
+    pub image_view_create_flags: vk::ImageViewCreateFlags,
     pub sharing_mode: vk::SharingMode,
     pub initial_layout: vk::ImageLayout,
     pub array_layers: u32,
     pub mip_levels: u32,
     pub image_type: vk::ImageType,
     pub format: vk::Format,
+    pub view_format: Option<vk::Format>,
     pub filter: vk::Filter
 }
 
@@ -29,6 +32,8 @@ impl Default for ImageConfig {
         ImageConfig {
             extent: vk::Extent3D { width: 0, height: 0, depth: 1 },
             image_usage_flags: vk::ImageUsageFlags::empty(),
+            image_create_flags: vk::ImageCreateFlags::empty(),
+            image_view_create_flags: vk::ImageViewCreateFlags::empty(),
             samples: vk::SampleCountFlags::TYPE_1,
             sharing_mode: vk::SharingMode::EXCLUSIVE,
             initial_layout: vk::ImageLayout::UNDEFINED,
@@ -36,6 +41,7 @@ impl Default for ImageConfig {
             mip_levels: 1,
             image_type: vk::ImageType::TYPE_2D,
             format: vk::Format::R8G8B8A8_UNORM,
+            view_format: None,
             filter: vk::Filter::NEAREST
         }
     }
@@ -173,6 +179,7 @@ impl Image {
 
         // Image
         let image_create_info = vk::ImageCreateInfo::default()
+            .flags(config.image_create_flags)
             .extent(config.extent)
             .samples(config.samples)
             .usage(config.image_usage_flags)
@@ -205,7 +212,8 @@ impl Image {
 
         // Image view
         let image_view_create_info = vk::ImageViewCreateInfo::default()
-            .format(config.format)
+            .flags(config.image_view_create_flags)
+            .format(config.view_format.unwrap_or(config.format))
             .view_type(vk::ImageViewType::TYPE_2D)
             .image(image)
             .components(ComponentMapping {

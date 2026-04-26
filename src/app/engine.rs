@@ -6,12 +6,12 @@ use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use crate::app::app::{AppComponent, AppConfig, UserEvent};
 use crate::app::gui::{GuiComponent, GuiSystem, Widget, WidgetKey, WidgetStore};
-use crate::app::Window;
+use crate::app::{Texture, Window};
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::graphics::{Renderer};
 use crate::graphics::image_store::{ImageKey, ImageStore};
 use crate::graphics::renderer::{RenderComponent, WindowState};
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device};
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, ImageTrait};
 
 /**
  * ## Cen engine
@@ -40,16 +40,16 @@ pub struct InitContext<'a> {
     pub queue: &'a Queue,
     pub command_pool: &'a CommandPool,
     widget_store: &'a mut WidgetStore,
-    resizable_images: Vec<ImageKey>
 }
 
 impl InitContext<'_> {
-    pub fn register_resizable_image(&mut self, image: ImageKey) {
-        self.resizable_images.push(image)
-    }
 
     pub fn add_widget(&mut self, widget: impl Widget + 'static) -> WidgetKey {
         self.widget_store.insert(Box::new(widget))
+    }
+
+    pub fn create_texture(&mut self, image: &impl ImageTrait) -> Texture {
+        self.gui_system.handler(self.allocator).create_texture(image)
     }
 }
 
@@ -88,14 +88,8 @@ impl Engine {
             queue: &renderer.queue,
             command_pool: &renderer.command_pool,
             widget_store: &mut widget_store,
-            resizable_images: Vec::new()
         };
         let app_component = Box::new(C::new(&mut init_context));
-
-        // Pass the resizable images to the renderer
-        init_context.resizable_images.iter().for_each(|i| {
-            renderer.register_dynamic_image(*i);
-        });
 
         command_buffer.end();
         renderer.submit_single_time_command_buffer(command_buffer);
@@ -123,6 +117,8 @@ impl Engine {
         self.window.window_event( event.clone(), event_loop );
 
         self.gui_system.on_window_event(self.window.winit_window(), &event);
+
+        self.app_component.window_event( event.clone());
 
         match event {
             WindowEvent::RedrawRequested => {

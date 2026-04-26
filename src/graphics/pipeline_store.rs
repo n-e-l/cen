@@ -64,8 +64,7 @@ impl PipelineStore {
         let watcher = notify_debouncer_mini::new_debouncer(
                 Duration::from_millis(250),
                 Self::watch_callback(proxy)
-            ).expect("Failed to create file watcher")
-        ;
+            ).expect("Failed to create file watcher");
 
         PipelineStore {
             watcher,

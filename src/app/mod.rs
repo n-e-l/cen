@@ -6,4 +6,3 @@ pub mod engine;
 pub use self::app::Cen;
 pub use self::window::Window;
 pub use self::gui::Texture;
-// pub use self::gui::WidgetStore;

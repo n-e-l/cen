@@ -21,7 +21,7 @@ gpu-allocator = { version = "0.28.0" }
 notify = { version = "6.1.1" }
 notify-debouncer-mini = "0.4.1"
 slotmap = "1.0.7"
-derive_builder = "0.20.2"
+bitflags = "2.11.1"
 
 # Gui
 egui-ash-renderer = { version = "0.11.0", features = ["gpu-allocator", "dynamic-rendering"] }

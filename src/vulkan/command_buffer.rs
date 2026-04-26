@@ -123,7 +123,7 @@ impl CommandBuffer {
 
     pub fn image_barriers<'a>(
         &mut self,
-        images: &[&dyn ImageTrait],
+        images: &[&impl ImageTrait],
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
         src_stage_mask: vk::PipelineStageFlags,

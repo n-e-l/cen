@@ -77,7 +77,7 @@ pub struct GuiHandler<'a>
     renderer_descriptor_pool: &'a DescriptorPool,
     egui_renderer: &'a mut egui_ash_renderer::Renderer,
     textures: &'a mut TextureMap,
-    used_textures: &'a mut Vec<Texture>
+    used_textures: &'a mut Vec<Texture>,
 }
 
 impl GuiHandler<'_>
@@ -161,6 +161,21 @@ impl GuiSystem {
             texture_layout,
             textures: HashMap::new(),
             used_textures: vec![],
+        }
+    }
+
+    pub fn handler<'a>(
+        &'a mut self,
+        allocator: &'a mut Allocator,
+    ) -> GuiHandler<'a> {
+        GuiHandler {
+            device: &self.device,
+            allocator,
+            texture_layout: &self.texture_layout,
+            renderer_descriptor_pool: &self.renderer_descriptor_pool,
+            egui_renderer: &mut self.egui_renderer,
+            textures: &mut self.textures,
+            used_textures: &mut self.used_textures,
         }
     }
 

@@ -84,6 +84,7 @@ impl AppConfig {
 
 pub trait AppComponent : RenderComponent + GuiComponent {
     fn new(ctx: &mut InitContext) -> Self where Self: Sized;
+    fn window_event(&mut self, event: WindowEvent);
 }
 
 #[derive(Debug, Default)]

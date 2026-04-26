@@ -33,7 +33,6 @@ pub trait RenderComponent {
 }
 
 pub struct Renderer {
-    dynamic_images: Vec<ImageKey>,
     pub pipeline_store: PipelineStore,
     pub image_store: ImageStore,
     pub render_finished_semaphores: Vec<vk::Semaphore>,
@@ -136,43 +135,19 @@ impl Renderer {
             frame_index: 0,
             start_time,
             present_mode,
-            dynamic_images: Vec::new()
         }
     }
 
-    pub fn register_dynamic_image(&mut self, image: ImageKey) {
-        self.dynamic_images.push(image);
-    }
 
     pub(crate) fn on_window_recreation(&mut self, window_state: WindowState) {
-
         self.device.wait_idle();
         info!("Recreating swapchain");
         self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
 
         // Update all subscribed images with the new resolution
-        let mut update_count = 0;
-        // retain, in order to remove invalid keys
-        self.dynamic_images.retain_mut(|key| {
-            match self.image_store.recreate(&self.device, &mut self.allocator, *key, |config| {
-                ImageConfig {
-                    extent: Extent3D {
-                        width: window_state.extent2d.width,
-                        height: window_state.extent2d.height,
-                        depth: 1
-                    },
-                    ..config
-                }
-            }) {
-                Ok(_) => {
-                    update_count += 1;
-                    true
-                }
-                Err(_) => { false }
-            }
-        });
+        let updated_keys = self.image_store.on_swapchain_resize(&self.device, &mut self.allocator, window_state.extent2d);
 
-        info!("Recreated {update_count} images with resolution {} {}", window_state.extent2d.width, window_state.extent2d.height);
+        // TODO: Update all linked textures
     }
 
     fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &mut [&mut dyn RenderComponent]) {
