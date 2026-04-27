@@ -1,7 +1,6 @@
 use std::time::SystemTime;
 use ash::vk::{Extent2D, Queue};
 use log::{debug, error, info};
-use slotmap::SlotMap;
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use crate::app::app::{AppComponent, AppConfig, UserEvent};
@@ -9,7 +8,7 @@ use crate::app::gui::{GuiComponent, GuiSystem};
 use crate::app::{Texture, Window};
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::graphics::{Renderer};
-use crate::graphics::image_store::{ImageKey, ImageStore};
+use crate::graphics::image_store::ImageStore;
 use crate::graphics::renderer::{RenderComponent, WindowState};
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, ImageTrait};
 

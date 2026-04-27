@@ -14,7 +14,6 @@ use log::{error, trace};
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
-use slotmap::{new_key_type, SlotMap};
 
 #[derive(Clone)]
 pub struct Texture {

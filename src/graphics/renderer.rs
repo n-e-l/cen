@@ -1,14 +1,14 @@
 use log::{info};
 use std::time::Instant;
 use ash::vk;
-use ash::vk::{Extent2D, Extent3D, ImageLayout, PhysicalDevice, Queue};
+use ash::vk::{Extent2D, ImageLayout, PhysicalDevice, Queue};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
 use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
-use crate::graphics::image_store::{ImageKey, ImageStore};
+use crate::graphics::image_store::ImageStore;
 use crate::graphics::pipeline_store::PipelineStore;
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, ImageConfig, Instance, Surface, Swapchain, SwapchainImage};
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain, SwapchainImage};
 
 pub struct RenderContext<'a> {
     pub device: &'a Device,
@@ -145,7 +145,7 @@ impl Renderer {
         self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
 
         // Update all subscribed images with the new resolution
-        let updated_keys = self.image_store.on_swapchain_resize(&self.device, &mut self.allocator, window_state.extent2d);
+        let _updated_keys = self.image_store.on_swapchain_resize(&self.device, &mut self.allocator, window_state.extent2d);
 
         // TODO: Update all linked textures
     }
