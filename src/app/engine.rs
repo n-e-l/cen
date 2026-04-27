@@ -13,7 +13,7 @@ use crate::graphics::renderer::{RenderComponent, WindowState};
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, ImageTrait};
 
 /**
- * ## Cen engine
+ * Cen engine
  * Manages and connects all separate components.
  */
 pub struct Engine {
@@ -40,7 +40,6 @@ pub struct InitContext<'a> {
 }
 
 impl InitContext<'_> {
-
     pub fn create_texture(&mut self, image: &impl ImageTrait) -> Texture {
         self.gui_system.handler(self.allocator).create_texture(image)
     }
@@ -66,7 +65,7 @@ impl Engine {
         let mut gui_system = GuiSystem::new(window.as_ref(), &mut renderer);
 
         // Initialize the user components
-        let mut command_buffer = renderer.create_command_buffer();
+        let mut command_buffer = CommandBuffer::new(&renderer.device, &renderer.command_pool, false);
         command_buffer.begin();
         let mut init_context = InitContext {
             gui_system: &mut gui_system,

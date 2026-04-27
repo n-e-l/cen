@@ -10,6 +10,17 @@ use crate::graphics::image_store::ImageStore;
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain, SwapchainImage};
 
+// -- Window --
+
+pub struct WindowState<'a> {
+    pub window_handle: WindowHandle<'a>,
+    pub display_handle: DisplayHandle<'a>,
+    pub extent2d: Extent2D,
+    pub scale_factor: f64,
+}
+
+// -- Contexts --
+
 pub struct RenderContext<'a> {
     pub device: &'a Device,
     pub allocator: &'a mut Allocator,
@@ -28,9 +39,13 @@ impl RenderContext<'_> {
     }
 }
 
+// -- Traits --
+
 pub trait RenderComponent {
     fn render(&mut self, ctx: &mut RenderContext);
 }
+
+// -- Renderer --
 
 pub struct Renderer {
     pub pipeline_store: PipelineStore,
@@ -51,13 +66,6 @@ pub struct Renderer {
     pub instance: Instance,
     pub start_time: Instant,
     present_mode: vk::PresentModeKHR,
-}
-
-pub struct WindowState<'a> {
-    pub window_handle: WindowHandle<'a>,
-    pub display_handle: DisplayHandle<'a>,
-    pub extent2d: Extent2D,
-    pub scale_factor: f64,
 }
 
 impl Renderer {
@@ -137,7 +145,6 @@ impl Renderer {
             present_mode,
         }
     }
-
 
     pub(crate) fn on_window_recreation(&mut self, window_state: WindowState) {
         self.device.wait_idle();
@@ -233,10 +240,6 @@ impl Renderer {
 
     pub fn pipeline_store(&mut self) -> &mut PipelineStore {
         &mut self.pipeline_store
-    }
-
-    pub fn create_command_buffer(&mut self) -> CommandBuffer {
-        CommandBuffer::new(&self.device, &self.command_pool, false)
     }
 
     pub fn submit_single_time_command_buffer(&mut self, command_buffer: CommandBuffer) {
