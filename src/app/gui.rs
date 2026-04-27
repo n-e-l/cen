@@ -16,12 +16,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use slotmap::{new_key_type, SlotMap};
 
-pub trait Widget: GuiComponent + RenderComponent
-{}
-
-new_key_type! { pub struct WidgetKey; }
-pub type WidgetStore = SlotMap<WidgetKey, Box<dyn Widget>>;
-
 #[derive(Clone)]
 pub struct Texture {
     id: Arc<TextureId>
@@ -32,7 +26,6 @@ impl GpuResource for Texture {
         self.id.clone()
     }
 }
-
 
 pub trait GuiComponent {
     fn gui(&mut self, gui: &mut GuiHandler, context: &Context);

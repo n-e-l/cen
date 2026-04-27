@@ -5,7 +5,7 @@ use slotmap::SlotMap;
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use crate::app::app::{AppComponent, AppConfig, UserEvent};
-use crate::app::gui::{GuiComponent, GuiSystem, Widget, WidgetKey, WidgetStore};
+use crate::app::gui::{GuiComponent, GuiSystem};
 use crate::app::{Texture, Window};
 use crate::graphics::pipeline_store::PipelineStore;
 use crate::graphics::{Renderer};
@@ -22,7 +22,6 @@ pub struct Engine {
     window: Box<Window>,
     gui_system: GuiSystem,
     renderer: Renderer,
-    widget_store: SlotMap<WidgetKey, Box<dyn Widget>>,
     frame_count: usize,
     last_print_time: SystemTime,
     log_fps: bool,
@@ -39,14 +38,9 @@ pub struct InitContext<'a> {
     pub swapchain_extent: Extent2D,
     pub queue: &'a Queue,
     pub command_pool: &'a CommandPool,
-    widget_store: &'a mut WidgetStore,
 }
 
 impl InitContext<'_> {
-
-    pub fn add_widget(&mut self, widget: impl Widget + 'static) -> WidgetKey {
-        self.widget_store.insert(Box::new(widget))
-    }
 
     pub fn create_texture(&mut self, image: &impl ImageTrait) -> Texture {
         self.gui_system.handler(self.allocator).create_texture(image)
@@ -72,8 +66,6 @@ impl Engine {
         // Setup gui
         let mut gui_system = GuiSystem::new(window.as_ref(), &mut renderer);
 
-        let mut widget_store = WidgetStore::default();
-
         // Initialize the user components
         let mut command_buffer = renderer.create_command_buffer();
         command_buffer.begin();
@@ -87,7 +79,6 @@ impl Engine {
             swapchain_extent: renderer.swapchain.get_extent(),
             queue: &renderer.queue,
             command_pool: &renderer.command_pool,
-            widget_store: &mut widget_store,
         };
         let app_component = Box::new(C::new(&mut init_context));
 
@@ -103,7 +94,6 @@ impl Engine {
             app_component,
             last_print_time: SystemTime::now(),
             log_fps: app_config.log_fps,
-            widget_store: Default::default()
         }
     }
 
@@ -188,10 +178,7 @@ impl Engine {
     pub fn draw(&mut self) {
         
         // Update our gui. Has to happen each frame or we will miss frames
-        let mut gui_components = self.widget_store.values_mut()
-            .map(|w| w.as_mut() as &mut dyn GuiComponent )
-            .collect::<Vec<_>>();
-        gui_components.push(self.app_component.as_mut());
+        let mut gui_components: Vec<&mut dyn GuiComponent> = vec![self.app_component.as_mut()];
         self.gui_system.update(
             &mut self.renderer.allocator,
             self.window.winit_window(),
@@ -199,11 +186,8 @@ impl Engine {
         );
 
         // Render all our components
+        let mut render_components: Vec<&mut dyn RenderComponent> = vec![self.app_component.as_mut()];
         // Add our gui system to our render components
-        let mut render_components = self.widget_store.values_mut()
-            .map(|w| w.as_mut() as &mut dyn RenderComponent)
-            .collect::<Vec<_>>();
-        render_components.push(self.app_component.as_mut());
         render_components.push(&mut self.gui_system);
 
         self.renderer.draw_frame(&mut render_components);
