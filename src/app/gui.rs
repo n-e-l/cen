@@ -16,13 +16,19 @@ use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 
 #[derive(Clone)]
+#[derive(Eq, Hash, PartialEq)]
+struct TextureHandle {
+    id: TextureId
+}
+
+#[derive(Clone)]
 pub struct Texture {
-    id: Arc<TextureId>
+    handle: Arc<TextureHandle>
 }
 
 impl GpuResource for Texture {
     fn reference(&self) -> Arc<dyn Any> {
-        self.id.clone()
+        self.handle.clone()
     }
 }
 
@@ -30,7 +36,7 @@ pub trait GuiComponent {
     fn gui(&mut self, gui: &mut GuiHandler, context: &Context);
 }
 
-type TextureMap = HashMap<TextureId, (Weak<TextureId>, DescriptorSet, Arc<dyn Any>)>;
+type TextureMap = HashMap<TextureHandle, (Weak<TextureHandle>, DescriptorSet, Arc<dyn Any>)>;
 
 pub struct GuiSystem {
     pub egui_ctx: Context,
@@ -46,12 +52,12 @@ pub struct GuiSystem {
 
 impl Drop for GuiSystem {
     fn drop(&mut self) {
-        for (id, (_, set, _)) in self.textures.iter() {
-            self.egui_renderer.remove_user_texture(*id);
+        for (handle, (_, set, _)) in self.textures.iter() {
+            self.egui_renderer.remove_user_texture(handle.id);
             unsafe {
                 self.device.handle().free_descriptor_sets(self.renderer_descriptor_pool.descriptor_pool, &[*set]).unwrap();
             }
-            trace!("Destroyed user texture {:?}", id);
+            trace!("Destroyed user texture {:?}", handle.id);
         }
         unsafe {
             self.device.handle().destroy_descriptor_set_layout(self.texture_layout, None);
@@ -69,6 +75,7 @@ pub struct GuiHandler<'a>
     renderer_descriptor_pool: &'a DescriptorPool,
     egui_renderer: &'a mut egui_ash_renderer::Renderer,
     textures: &'a mut TextureMap,
+    // Tracker for texture lifetimes
     used_textures: &'a mut Vec<Texture>,
 }
 
@@ -84,18 +91,22 @@ impl GuiHandler<'_>
             image.sampler(),
         ).unwrap();
 
-        let id = self.egui_renderer.add_user_texture(descriptor_set);
-        let texture = Texture {
-            id: Arc::new(id.clone())
+        let handle = TextureHandle {
+            id: self.egui_renderer.add_user_texture(descriptor_set)
         };
-        self.textures.insert(id, (Arc::downgrade(&texture.id), descriptor_set, image.reference()));
+        let texture = Texture {
+            handle: Arc::new(handle.clone())
+        };
+        self.textures.insert(handle, (Arc::downgrade(&texture.handle), descriptor_set, image.reference()));
 
         texture
     }
 
     pub fn get_texture_id(&mut self, texture: &Texture) -> TextureId {
+        // Register the texture in order to keep it alive
         self.used_textures.push(texture.clone());
-        texture.id.as_ref().clone()
+
+        texture.handle.as_ref().clone().id
     }
 }
 
@@ -178,21 +189,21 @@ impl GuiSystem {
     pub fn update(&mut self, allocator: &mut Allocator, window: &winit::window::Window, components: &mut [&mut dyn GuiComponent]) {
 
         // Remove unused images
-        self.textures.retain(|id, (texture, set, _)| {
+        self.textures.retain(|handle, (texture, set, _)| {
             match texture.upgrade() {
                 None => {
                     // There are no more shared references to the texture, so it may be removed
                     unsafe {
                         self.device.handle().free_descriptor_sets(self.renderer_descriptor_pool.descriptor_pool, &[*set]).unwrap();
                     }
-                    self.egui_renderer.remove_user_texture(*id);
+                    self.egui_renderer.remove_user_texture(handle.id);
                     false
                 }
                 Some(_) => { true }
             }
         });
 
-        // Execute the gui instauctions
+        let raw_input = self.egui_winit.take_egui_input(window);
         let mut handler = GuiHandler
         {
             device: &self.device,
@@ -203,7 +214,6 @@ impl GuiSystem {
             textures: &mut self.textures,
             used_textures: &mut self.used_textures
         };
-        let raw_input = self.egui_winit.take_egui_input(window);
         self.egui_output = Some(self.egui_ctx.run(raw_input, |ctx| {
             for component in &mut *components {
                 component.gui(&mut handler, ctx);
