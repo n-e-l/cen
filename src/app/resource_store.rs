@@ -1,13 +1,7 @@
-use std::sync::{Arc, Mutex, RwLock};
-use ash::vk::Extent2D;
+use std::sync::{Arc, RwLock};
 use bitflags::bitflags;
-use egui::IntoAtoms;
-use slotmap::{new_key_type, SlotMap};
-use crate::app::gui::GuiContext;
 use crate::app::TextureKey;
-use crate::graphics::image_store::{ImageKey, ImageStore};
-use crate::graphics::renderer::{GraphicsContext, ImageContext};
-use crate::vulkan::{Allocator, Device, Image, ImageConfig};
+use crate::graphics::image_store::ImageKey;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Default)]
@@ -78,7 +72,7 @@ impl ResourceStore {
     }
 
     pub fn cleanup(&mut self) {
-        self.images.retain(|(resource, flags)| {
+        self.images.retain(|(resource, _flags)| {
             Arc::strong_count(&resource.0) > 1
         });
     }

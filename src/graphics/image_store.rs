@@ -1,6 +1,6 @@
 use std::sync::{Arc, Weak};
 use slotmap::{new_key_type, SlotMap};
-use crate::vulkan::{Device, Image};
+use crate::vulkan::Image;
 
 new_key_type! { pub struct ImageId; }
 

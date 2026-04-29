@@ -2,17 +2,16 @@ use log::{info};
 use std::time::Instant;
 use ash::vk;
 use ash::vk::{Extent2D, ImageLayout, PhysicalDevice, Queue};
-use egui::TextureId;
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
 use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
 use crate::app::engine::{CenContext};
-use crate::app::{ImageFlags, ImageResource, ResourceStore, TextureKey};
-use crate::app::gui::{GuiContext, GuiData, GuiSystem};
+use crate::app::{ImageFlags, ImageResource, ResourceStore};
+use crate::app::gui::{GuiData, GuiSystem};
 use crate::graphics::image_store::ImageStore;
 use crate::graphics::pipeline_store::{IntoPipelineHandle, PipelineKey, PipelineStore};
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, ImageConfig, Instance, Pipeline, PipelineErr, Surface, Swapchain, SwapchainImage};
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, ImageConfig, Instance, Pipeline, PipelineErr, Surface, Swapchain};
 
 // -- Window --
 
@@ -148,7 +147,7 @@ impl Renderer {
             pipeline_store
         };
 
-        let mut resource_store = ResourceStore::new();
+        let resource_store = ResourceStore::new();
         let image_store = ImageStore::new();
         let image_context = ImageContext {
             image_store,

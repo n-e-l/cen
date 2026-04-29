@@ -1,11 +1,10 @@
-use crate::app::{ImageFlags, ImageResource, Window};
+use crate::app::{ImageResource, Window};
 use crate::graphics::renderer::{GraphicsContext, ImageContext, RenderComponent};
 use crate::graphics::Renderer;
 use crate::vulkan::memory::GpuResource;
-use crate::vulkan::{DescriptorPool, Device, Image, ImageTrait};
-use crate::vulkan::Allocator;
+use crate::vulkan::{DescriptorPool, Device, ImageTrait};
 use ash::vk;
-use ash::vk::{AccessFlags, AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, Extent2D, ImageLayout, Offset2D, PipelineStageFlags, Rect2D, RenderingAttachmentInfo};
+use ash::vk::{AccessFlags, AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, ImageLayout, Offset2D, PipelineStageFlags, Rect2D, RenderingAttachmentInfo};
 use egui::{Context, FullOutput, TextureId, ViewportId};
 use egui_ash_renderer::vulkan::{create_vulkan_descriptor_set, create_vulkan_descriptor_set_layout};
 use egui_ash_renderer::{DynamicRendering, Options};

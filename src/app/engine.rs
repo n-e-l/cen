@@ -1,18 +1,13 @@
-use std::arch::aarch64::float32x2_t;
 use std::time::SystemTime;
-use ash::vk::{Extent2D, Queue};
 use log::{debug, error, info};
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use crate::app::app::{AppComponent, AppConfig, UserEvent};
-use crate::app::gui::{GuiComponent, GuiSystem, TextureKey};
+use crate::app::gui::{GuiComponent, GuiSystem};
 use crate::app::{Window};
-use crate::app::resource_store::{ImageFlags, ImageResource, ResourceStore};
-use crate::graphics::pipeline_store::{IntoPipelineHandle, PipelineKey, PipelineStore};
 use crate::graphics::{Renderer};
-use crate::graphics::image_store::{ImageKey, ImageStore};
 use crate::graphics::renderer::{GraphicsContext, ImageContext, PipelineContext, RenderComponent, WindowState};
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, ImageConfig, ImageTrait, Pipeline, PipelineErr, SwapchainImage};
+use crate::vulkan::{CommandBuffer, ImageTrait, SwapchainImage};
 
 /**
  * Cen engine
@@ -55,7 +50,7 @@ impl Engine {
         let mut renderer = Renderer::new(&window_state, proxy, app_config.vsync);
 
         // Setup gui
-        let mut gui_system = GuiSystem::new(window.as_ref(), &mut renderer);
+        let gui_system = GuiSystem::new(window.as_ref(), &mut renderer);
 
 
         // Initialize the user components
