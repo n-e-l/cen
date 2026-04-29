@@ -18,8 +18,7 @@ struct ComputeExample {
 
 impl AppComponent for ComputeExample {
     fn new(ctx: &mut CenContext) -> Self {
-        let image = ctx.images.create(
-            ctx.gfx,
+        let image = ctx.create_image(
             ImageConfig {
                 extent: Extent3D {
                     width: 1,

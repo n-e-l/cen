@@ -1,9 +1,9 @@
-use crate::app::{ImageResource, Window};
+use crate::app::{ImageFlags, ImageResource, Window};
 use crate::graphics::{GraphicsContext, ImageContext};
 use crate::graphics::renderer::RenderComponent;
 use crate::graphics::Renderer;
 use crate::vulkan::memory::GpuResource;
-use crate::vulkan::{DescriptorPool, Device, ImageTrait};
+use crate::vulkan::{DescriptorPool, Device, ImageConfig, ImageTrait};
 use ash::vk;
 use ash::vk::{AccessFlags, AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, DescriptorSet, DescriptorSetLayout, ImageLayout, Offset2D, PipelineStageFlags, Rect2D, RenderingAttachmentInfo};
 use egui::{Context, FullOutput, TextureId, ViewportId};
@@ -37,6 +37,12 @@ pub struct GuiContext<'a> {
     pub gfx: &'a mut GraphicsContext,
     pub images: &'a mut ImageContext,
     used_textures: Vec<TextureKey>
+}
+
+impl GuiContext<'_> {
+    pub fn create_image(&mut self, config: ImageConfig, flags: ImageFlags) -> ImageResource {
+        self.images.create(self.gfx, config, flags)
+    }
 }
 
 impl GuiData {

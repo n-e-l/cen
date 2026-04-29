@@ -25,8 +25,7 @@ impl AppComponent for EguiExample {
     fn new(ctx: &mut CenContext) -> Self {
 
         // We're using the image store in order to get automatic swapchain resizable images
-        let image = ctx.images.create(
-            ctx.gfx,
+        let image = ctx.create_image(
             ImageConfig {
                 extent: Extent3D {
                     width: 100,
@@ -39,8 +38,7 @@ impl AppComponent for EguiExample {
             ImageFlags::MATCH_SWAPCHAIN_EXTENT
         );
 
-        let texture = ctx.images.create(
-            ctx.gfx,
+        let texture = ctx.create_image(
             ImageConfig {
                 extent: Extent3D {
                     width: 100,
@@ -205,8 +203,7 @@ impl GuiComponent for EguiExample {
 
                 let size = gui.images.get(&self.texture).extent();
                 if size.width != self.slider  {
-                    self.texture = gui.images.create(
-                        gui.gfx,
+                    self.texture = gui.create_image(
                         ImageConfig {
                             extent: Extent3D {
                                 width: self.slider,

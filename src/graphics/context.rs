@@ -19,7 +19,7 @@ pub struct ImageContext {
 
 impl ImageContext {
 
-    pub fn create(&mut self, gfx: &mut GraphicsContext, config: ImageConfig, flags: ImageFlags) -> ImageResource {
+    pub(crate) fn create(&mut self, gfx: &mut GraphicsContext, config: ImageConfig, flags: ImageFlags) -> ImageResource {
         let image_key = self.image_store.insert(Image::new(&gfx.device, &mut gfx.allocator, config));
         let resource = ImageResource::new(image_key);
         self.images.push((resource.clone(), flags));

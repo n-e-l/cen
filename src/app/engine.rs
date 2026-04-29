@@ -4,11 +4,11 @@ use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use crate::app::app::{AppComponent, AppConfig, UserEvent};
 use crate::app::gui::{GuiComponent, GuiSystem};
-use crate::app::{Window};
+use crate::app::{ImageFlags, ImageResource, Window};
 use crate::graphics::{Renderer};
 use crate::graphics::{GraphicsContext, ImageContext, PipelineContext};
 use crate::graphics::renderer::RenderComponent;
-use crate::vulkan::WindowState;
+use crate::vulkan::{ImageConfig, WindowState};
 use crate::vulkan::{CommandBuffer, ImageTrait, SwapchainImage};
 
 /**
@@ -33,6 +33,12 @@ pub struct CenContext<'a>
     pub pipelines: &'a mut PipelineContext,
     pub command_buffer: &'a mut CommandBuffer,
     pub swapchain_image: Option<&'a SwapchainImage>,
+}
+
+impl CenContext<'_> {
+    pub fn create_image(&mut self, config: ImageConfig, flags: ImageFlags) -> ImageResource {
+        self.images.create(self.gfx, config, flags)
+    }
 }
 
 impl Engine {
