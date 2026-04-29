@@ -39,80 +39,58 @@ pub struct GuiContext<'a> {
     used_textures: Vec<TextureKey>
 }
 
-impl GuiContext<'_> {
+impl GuiData {
 
-    pub fn create_texture(&mut self, image: ImageKey) -> Option<TextureKey> {
-        if let Some(si) = self.images.image_store.get_handle(&image) {
+    pub fn create_texture(&mut self, image_store: &mut ImageStore, image: ImageKey) -> Option<TextureKey> {
+        if let Some(si) = image_store.get_handle(&image) {
 
-            let device = self.gui_data.device.handle();
+            let device = self.device.handle();
             let descriptor_set = create_vulkan_descriptor_set(
                 device,
-                self.gui_data.texture_layout,
-                self.gui_data.renderer_descriptor_pool.handle(),
+                self.texture_layout,
+                self.renderer_descriptor_pool.handle(),
                 si.image.image_view(),
                 si.image.sampler(),
             ).unwrap();
 
             let handle = TextureHandle {
                 image_key: image.clone(),
-                id: self.gui_data.egui_renderer.add_user_texture(descriptor_set)
+                id: self.egui_renderer.add_user_texture(descriptor_set)
             };
             let texture: TextureKey  = Arc::new(handle.clone());
 
-            self.gui_data.textures.insert(handle, (Arc::downgrade(&texture), descriptor_set, si.image.reference()));
+            self.textures.insert(handle, (Arc::downgrade(&texture), descriptor_set, si.image.reference()));
 
             return Some(texture);
         }
         None
     }
 
-    pub fn get_texture(&mut self, resource: &mut ImageResource) -> TextureId
-    {
-        let key = if let Some(texture) = resource.texture_key() {
-            texture
+    pub fn get_texture(&mut self, image_store: &mut ImageStore, resource: &mut ImageResource) -> TextureKey {
+        if let Some(texture_key) = resource.texture_key() {
+            texture_key
         } else {
             // Create the texture
-            let key = self.create_texture(resource.image_key()).unwrap();
-            resource.set_texture_key(key.clone());
-            key
-        };
+            let texture_key = self.create_texture(image_store, resource.image_key()).unwrap();
+            resource.set_texture_key(texture_key.clone());
+            texture_key
+        }
+    }
+}
+
+impl GuiContext<'_> {
+    pub fn create_texture(&mut self, image: ImageKey) -> Option<TextureKey> {
+        self.gui_data.create_texture(&mut self.images.image_store, image)
+    }
+
+    pub fn get_texture(&mut self, resource: &mut ImageResource) -> TextureId
+    {
+        let key = self.gui_data.get_texture(&mut self.images.image_store, resource);
 
         // Share the key with the command buffer
         self.used_textures.push(key.clone());
 
         key.id
-    }
-
-    pub(crate) fn on_swapchain_resize(&mut self, extent: Extent2D) {
-        // Collect keys and flags first, releasing the borrow on resource_store
-        let resizeable: Vec<_> = self.images.resource_store
-            .entries_mut()
-            .into_iter()
-            .filter_map(|(resource, flags)| {
-                if flags.contains(ImageFlags::MATCH_SWAPCHAIN_EXTENT) {
-                    Some(resource.clone()) // or whatever handle/key you need
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        for resource in resizeable {
-            let image = self.images.image_store.get(&resource.0.read().unwrap().image_key);
-            let mut config = image.config();
-            config.extent.width = extent.width;
-            config.extent.height = extent.height;
-
-            let image_key = self.images.image_store.insert(
-                Image::new(&self.gfx.device, &mut self.gfx.allocator, config)
-            );
-
-            resource.0.write().unwrap().image_key = image_key.clone();
-
-            if let Some(texture) = &mut resource.0.write().unwrap().texture_key {
-                *texture = self.create_texture(image_key).unwrap();
-            }
-        }
     }
 }
 

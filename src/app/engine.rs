@@ -122,7 +122,7 @@ impl Engine {
                     extent2d: self.window.get_extent(),
                     scale_factor: self.window.scale_factor(),
                 };
-                self.renderer.on_window_recreation(&mut self.gui_system, window_state);
+                self.renderer.on_window_recreation(&mut self.gui_system.gui_data, window_state);
             },
             WindowEvent::ScaleFactorChanged { .. } => {
                 let window_state = WindowState {
@@ -131,7 +131,7 @@ impl Engine {
                     extent2d: self.window.get_extent(),
                     scale_factor: self.window.scale_factor(),
                 };
-                self.renderer.on_window_recreation(&mut self.gui_system, window_state);
+                self.renderer.on_window_recreation(&mut self.gui_system.gui_data, window_state);
             }
             _ => (),
         }

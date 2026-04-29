@@ -9,7 +9,7 @@ use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
 use crate::app::engine::{CenContext};
 use crate::app::{ImageFlags, ImageResource, ResourceStore, TextureKey};
-use crate::app::gui::{GuiContext, GuiSystem};
+use crate::app::gui::{GuiContext, GuiData, GuiSystem};
 use crate::graphics::image_store::ImageStore;
 use crate::graphics::pipeline_store::{IntoPipelineHandle, PipelineKey, PipelineStore};
 use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, ImageConfig, Instance, Pipeline, PipelineErr, Surface, Swapchain, SwapchainImage};
@@ -180,18 +180,41 @@ impl Renderer {
         }
     }
 
-    pub(crate) fn on_window_recreation(&mut self, gui_system: &mut GuiSystem, window_state: WindowState) {
+    pub(crate) fn on_window_recreation(&mut self, gui_data: &mut GuiData, window_state: WindowState) {
 
         self.graphics_context.device.wait_idle();
         info!("Recreating swapchain");
         self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.graphics_context.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
 
-        // Update all subscribed images with the new
-        let mut gui_context = gui_system.context(
-            &mut self.graphics_context,
-            &mut self.image_context
-        );
-        gui_context.on_swapchain_resize(self.swapchain.get_extent());
+        // Collect keys and flags first, releasing the borrow on resource_store
+        let resizeable: Vec<_> = self.image_context.resource_store
+            .entries_mut()
+            .into_iter()
+            .filter_map(|(resource, flags)| {
+                if flags.contains(ImageFlags::MATCH_SWAPCHAIN_EXTENT) {
+                    Some(resource.clone()) // or whatever handle/key you need
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for resource in resizeable {
+            let image = self.image_context.image_store.get(&resource.0.read().unwrap().image_key);
+            let mut config = image.config();
+            config.extent.width = self.swapchain.get_extent().width;
+            config.extent.height = self.swapchain.get_extent().height;
+
+            let image_key = self.image_context.image_store.insert(
+                Image::new(&self.graphics_context.device, &mut self.graphics_context.allocator, config)
+            );
+
+            resource.0.write().unwrap().image_key = image_key.clone();
+
+            if let Some(texture) = &mut resource.0.write().unwrap().texture_key {
+                *texture = gui_data.create_texture(&mut self.image_context.image_store, image_key).unwrap();
+            }
+        }
     }
 
     fn record_command_buffer<'a>(&mut self, gui: &mut GuiSystem, frame_index: usize, image_index: usize, render_components: &mut [&mut dyn RenderComponent]) {
