@@ -1,16 +1,18 @@
+use std::arch::aarch64::float32x2_t;
 use std::time::SystemTime;
 use ash::vk::{Extent2D, Queue};
 use log::{debug, error, info};
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use crate::app::app::{AppComponent, AppConfig, UserEvent};
-use crate::app::gui::{GuiComponent, GuiSystem};
-use crate::app::{Texture, Window};
-use crate::graphics::pipeline_store::PipelineStore;
+use crate::app::gui::{GuiComponent, GuiSystem, TextureKey};
+use crate::app::{Window};
+use crate::app::resource_store::{ImageFlags, ImageResource, ResourceStore};
+use crate::graphics::pipeline_store::{IntoPipelineHandle, PipelineKey, PipelineStore};
 use crate::graphics::{Renderer};
-use crate::graphics::image_store::ImageStore;
-use crate::graphics::renderer::{RenderComponent, WindowState};
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, ImageTrait};
+use crate::graphics::image_store::{ImageKey, ImageStore};
+use crate::graphics::renderer::{GraphicsContext, ImageContext, PipelineContext, RenderComponent, WindowState};
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, ImageConfig, ImageTrait, Pipeline, PipelineErr, SwapchainImage};
 
 /**
  * Cen engine
@@ -27,22 +29,13 @@ pub struct Engine {
     app_component: Box<dyn AppComponent>
 }
 
-pub struct InitContext<'a> {
-    pub gui_system: &'a mut GuiSystem,
-    pub device: &'a Device,
-    pub allocator: &'a mut Allocator,
-    pub image_store: &'a mut ImageStore,
-    pub pipeline_store: &'a mut PipelineStore,
+pub struct CenContext<'a>
+{
+    pub gfx: &'a mut GraphicsContext,
+    pub images: &'a mut ImageContext,
+    pub pipelines: &'a mut PipelineContext,
     pub command_buffer: &'a mut CommandBuffer,
-    pub swapchain_extent: Extent2D,
-    pub queue: &'a Queue,
-    pub command_pool: &'a CommandPool,
-}
-
-impl InitContext<'_> {
-    pub fn create_texture(&mut self, image: &impl ImageTrait) -> Texture {
-        self.gui_system.handler(self.allocator).create_texture(image)
-    }
+    pub swapchain_image: Option<&'a SwapchainImage>,
 }
 
 impl Engine {
@@ -64,19 +57,17 @@ impl Engine {
         // Setup gui
         let mut gui_system = GuiSystem::new(window.as_ref(), &mut renderer);
 
+
         // Initialize the user components
-        let mut command_buffer = CommandBuffer::new(&renderer.device, &renderer.command_pool, false);
+        let mut command_buffer = CommandBuffer::new(&renderer.graphics_context.device, &renderer.graphics_context.command_pool, false);
         command_buffer.begin();
-        let mut init_context = InitContext {
-            gui_system: &mut gui_system,
-            device: &renderer.device,
-            allocator: &mut renderer.allocator,
-            image_store: &mut renderer.image_store,
-            pipeline_store: &mut renderer.pipeline_store,
+
+        let mut init_context = CenContext {
+            gfx: &mut renderer.graphics_context,
+            images: &mut renderer.image_context,
+            pipelines: &mut renderer.pipeline_context,
             command_buffer: &mut command_buffer,
-            swapchain_extent: renderer.swapchain.get_extent(),
-            queue: &renderer.queue,
-            command_pool: &renderer.command_pool,
+            swapchain_image: None,
         };
         let app_component = Box::new(C::new(&mut init_context));
 
@@ -98,7 +89,7 @@ impl Engine {
     pub(crate) fn exit(&self) {
         // Wait for all render operations to finish before exiting
         // This ensures we can safely start dropping gpu resources
-        self.renderer.device.wait_idle();
+        self.renderer.graphics_context.device.wait_idle();
     }
     
     pub(crate) fn window_event(&mut self, event_loop: &ActiveEventLoop, event: WindowEvent) {
@@ -131,7 +122,7 @@ impl Engine {
                     extent2d: self.window.get_extent(),
                     scale_factor: self.window.scale_factor(),
                 };
-                self.renderer.on_window_recreation(window_state);
+                self.renderer.on_window_recreation(&mut self.gui_system, window_state);
             },
             WindowEvent::ScaleFactorChanged { .. } => {
                 let window_state = WindowState {
@@ -140,7 +131,7 @@ impl Engine {
                     extent2d: self.window.get_extent(),
                     scale_factor: self.window.scale_factor(),
                 };
-                self.renderer.on_window_recreation(window_state);
+                self.renderer.on_window_recreation(&mut self.gui_system, window_state);
             }
             _ => (),
         }
@@ -151,7 +142,7 @@ impl Engine {
             | UserEvent::GlslUpdate(path) => {
                 debug!("Reloading shader: {:?}", path);
 
-                if let Err(e) = self.renderer.pipeline_store.reload(&path) {
+                if let Err(e) = self.renderer.pipeline_context.pipeline_store.reload(&path) {
                     error!("{}", e);
                 }
             }
@@ -178,16 +169,14 @@ impl Engine {
         // Update our gui. Has to happen each frame or we will miss frames
         let mut gui_components: Vec<&mut dyn GuiComponent> = vec![self.app_component.as_mut()];
         self.gui_system.update(
-            &mut self.renderer.allocator,
+            &mut self.renderer.graphics_context,
+            &mut self.renderer.image_context,
             self.window.winit_window(),
             &mut gui_components
         );
 
         // Render all our components
         let mut render_components: Vec<&mut dyn RenderComponent> = vec![self.app_component.as_mut()];
-        // Add our gui system to our render components
-        render_components.push(&mut self.gui_system);
-
-        self.renderer.draw_frame(&mut render_components);
+        self.renderer.draw_frame(&mut self.gui_system, &mut render_components);
     }
 }

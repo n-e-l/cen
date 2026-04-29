@@ -6,7 +6,7 @@ use log::{LevelFilter};
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 use winit::window::WindowId;
-use crate::app::engine::{Engine, InitContext};
+use crate::app::engine::{CenContext, Engine};
 use crate::app::gui::{GuiComponent};
 use crate::graphics::renderer::{RenderComponent};
 
@@ -83,7 +83,7 @@ impl AppConfig {
 }
 
 pub trait AppComponent : RenderComponent + GuiComponent {
-    fn new(ctx: &mut InitContext) -> Self where Self: Sized;
+    fn new(ctx: &mut CenContext) -> Self where Self: Sized;
     fn window_event(&mut self, event: WindowEvent);
 }
 

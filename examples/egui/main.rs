@@ -1,44 +1,58 @@
 use cen::graphics::pipeline_store::{PipelineKey};
 use ash::vk;
 use ash::vk::{Extent3D, WriteDescriptorSet};
-use egui::Context;
+use egui::{Context, Slider};
 use winit::event::WindowEvent;
 use cen::app::app::{AppComponent, AppConfig, Cen};
-use cen::app::gui::{GuiComponent, GuiHandler};
-use cen::app::engine::InitContext;
-use cen::graphics::image_store::{ImageFlags, ImageKey};
-use cen::graphics::renderer::{RenderComponent, RenderContext};
-use cen::vulkan::{DescriptorSetLayout, ImageTrait, ImageConfig, Image, ComputePipelineConfig};
+use cen::app::gui::{GuiComponent, GuiContext, GuiData, GuiSystem};
+use cen::app::engine::{CenContext};
+use cen::app::{ImageFlags, ImageResource};
+use cen::graphics::renderer::{ImageContext, RenderComponent};
+use cen::vulkan::{DescriptorSetLayout, ImageTrait, ImageConfig, ComputePipelineConfig};
 
 #[allow(dead_code)]
 struct EguiExample {
-    image: ImageKey,
+    image: ImageResource,
+    texture: ImageResource,
     descriptorset: DescriptorSetLayout,
     pipeline_a: PipelineKey,
     pipeline_b: PipelineKey,
+    slider: u32,
     pressed: bool,
 }
 
 impl AppComponent for EguiExample {
-    fn new(ctx: &mut InitContext) -> Self {
+    fn new(ctx: &mut CenContext) -> Self {
 
-        // Image, we're using the image store in order to get automatic swapchain resizable images
-        let image = ctx.image_store.insert_with_flags(
-            ImageFlags::MATCH_SWAPCHAIN_EXTENT,
-            Image::new(
-                &ctx.device,
-                &mut ctx.allocator,
-                ImageConfig {
-                    extent: Extent3D {
-                        width: ctx.swapchain_extent.width,
-                        height: ctx.swapchain_extent.height,
-                        depth: 1
-                    },
-                    image_usage_flags: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
-                    ..Default::default()
-                }
-            )
+        // We're using the image store in order to get automatic swapchain resizable images
+        let image = ctx.images.create(
+            ctx.gfx,
+            ImageConfig {
+                extent: Extent3D {
+                    width: 100,
+                    height: 100,
+                    depth: 1
+                },
+                image_usage_flags: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
+                ..Default::default()
+            },
+            ImageFlags::MATCH_SWAPCHAIN_EXTENT
         );
+
+        let texture = ctx.images.create(
+            ctx.gfx,
+            ImageConfig {
+                extent: Extent3D {
+                    width: 100,
+                    height: 100,
+                    depth: 1
+                },
+                image_usage_flags: vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+                ..Default::default()
+            },
+            ImageFlags::empty()
+        );
+
 
         // Layout
         let layout_bindings = &[
@@ -49,12 +63,12 @@ impl AppComponent for EguiExample {
                 .stage_flags(vk::ShaderStageFlags::COMPUTE ),
         ];
         let descriptorset = DescriptorSetLayout::new_push_descriptor(
-            &ctx.device,
+            &ctx.gfx.device,
             layout_bindings
         );
 
         // Pipeline
-        let pipeline_a = ctx.pipeline_store.insert(ComputePipelineConfig {
+        let pipeline_a = ctx.pipelines.create_pipeline(ComputePipelineConfig {
             shader_source: "examples/egui/shader_a.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
@@ -63,7 +77,7 @@ impl AppComponent for EguiExample {
             macros: Default::default(),
         }).expect("Failed to create pipeline");
 
-        let pipeline_b = ctx.pipeline_store.insert(ComputePipelineConfig {
+        let pipeline_b = ctx.pipelines.create_pipeline(ComputePipelineConfig {
             shader_source: "examples/egui/shader_b.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
@@ -74,9 +88,11 @@ impl AppComponent for EguiExample {
 
         Self {
             image,
+            texture,
             descriptorset,
             pipeline_a,
             pipeline_b,
+            slider: 100,
             pressed: false,
         }
     }
@@ -86,9 +102,35 @@ impl AppComponent for EguiExample {
 }
 
 impl RenderComponent for EguiExample {
-    fn render(&mut self, ctx: &mut RenderContext) {
+    fn render(&mut self, ctx: &mut CenContext) {
 
-        let image = ctx.image_store.get(self.image).expect("Image should exist");
+        // Clear the texture
+        let texture_image = ctx.images.get(&self.texture);
+        ctx.command_buffer.image_barrier(
+            texture_image,
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            vk::PipelineStageFlags::TOP_OF_PIPE,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::AccessFlags::NONE,
+            vk::AccessFlags::TRANSFER_WRITE
+        );
+        ctx.command_buffer.clear_color_image(
+            texture_image,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            [0.0, 1.0, 0.0, 1.0]
+        );
+        ctx.command_buffer.image_barrier(
+            texture_image,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+            vk::AccessFlags::TRANSFER_WRITE,
+            vk::AccessFlags::NONE
+        );
+
+        let image = ctx.images.get(&self.image);
 
         ctx.command_buffer.image_barrier(
             image,
@@ -102,9 +144,9 @@ impl RenderComponent for EguiExample {
 
         // Render
         let compute = if !self.pressed {
-            ctx.pipeline_store.get(self.pipeline_a).unwrap()
+            ctx.pipelines.get(self.pipeline_a).unwrap()
         } else {
-            ctx.pipeline_store.get(self.pipeline_b).unwrap()
+            ctx.pipelines.get(self.pipeline_b).unwrap()
         };
 
         ctx.command_buffer.bind_pipeline(compute);
@@ -138,7 +180,7 @@ impl RenderComponent for EguiExample {
 
         // Transition the swapchain image
         ctx.command_buffer.image_barrier(
-            ctx.swapchain_image,
+            ctx.swapchain_image.unwrap(),
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::PipelineStageFlags::TOP_OF_PIPE,
@@ -149,7 +191,7 @@ impl RenderComponent for EguiExample {
 
         // Copy to the swapchain
         ctx.command_buffer.clear_color_image(
-            ctx.swapchain_image,
+            ctx.swapchain_image.unwrap(),
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             [0.0, 0.0, 0.0, 1.0]
         );
@@ -158,7 +200,7 @@ impl RenderComponent for EguiExample {
         ctx.command_buffer.blit_image(
             image,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            ctx.swapchain_image,
+            ctx.swapchain_image.unwrap(),
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             &[vk::ImageBlit::default()
                 .src_offsets([
@@ -189,7 +231,7 @@ impl RenderComponent for EguiExample {
 
         // Transfer back to default states
         ctx.command_buffer.image_barrier(
-            ctx.swapchain_image,
+            ctx.swapchain_image.unwrap(),
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
             vk::PipelineStageFlags::TRANSFER,
@@ -213,12 +255,39 @@ impl RenderComponent for EguiExample {
 }
 
 impl GuiComponent for EguiExample {
-    fn gui(&mut self, _: &mut GuiHandler, ctx: &Context) {
+    fn gui(&mut self, gui: &mut GuiContext, ctx: &Context) {
         egui::Window::new("Shader controls")
             .resizable(true)
             .title_bar(true)
             .show(ctx, |ui| {
                 ui.checkbox(&mut self.pressed, "Alt");
+
+                ui.label("Dynamic textures:");
+                ui.add(Slider::new(&mut self.slider, 10..=1000));
+
+                let size = gui.images.get(&self.texture).extent();
+                if(size.width != self.slider ) {
+                    self.texture = gui.images.create(
+                        gui.gfx,
+                        ImageConfig {
+                            extent: Extent3D {
+                                width: self.slider,
+                                height: self.slider,
+                                depth: 1
+                            },
+                            image_usage_flags: vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+                            ..Default::default()
+                        },
+                        ImageFlags::empty()
+                    );
+                }
+
+                let extent = gui.images.get(&self.texture).extent();
+
+                ui.add(egui::Image::new(egui::load::SizedTexture::new(
+                    gui.get_texture(&mut self.texture),
+                    egui::vec2(extent.width as f32, extent.height as f32),
+                )));
             }
         );
     }
@@ -227,6 +296,7 @@ impl GuiComponent for EguiExample {
 fn main() {
     Cen::<EguiExample>::run(
         AppConfig::default()
+            .vsync(false)
               .resizable(true)
     );
 }

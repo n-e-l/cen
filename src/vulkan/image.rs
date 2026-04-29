@@ -47,6 +47,10 @@ impl Default for ImageConfig {
     }
 }
 
+pub trait ImageRef {
+    fn resolve_image<'a>() -> &'a Image;
+}
+
 pub trait ImageTrait: GpuResource {
     fn handle(&self) -> vk::Image;
     fn image_view(&self) -> vk::ImageView;
