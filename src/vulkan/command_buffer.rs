@@ -6,6 +6,31 @@ use crate::vulkan::{Buffer, CommandPool, Device, Framebuffer, ImageTrait, Pipeli
 use crate::vulkan::device::DeviceInner;
 use crate::vulkan::memory::GpuResource;
 
+fn layout_stage_access(layout: vk::ImageLayout) -> (vk::PipelineStageFlags, vk::AccessFlags) {
+    use vk::{PipelineStageFlags as S, AccessFlags as A};
+    match layout {
+        vk::ImageLayout::UNDEFINED | vk::ImageLayout::PREINITIALIZED =>
+            (S::TOP_OF_PIPE,    A::empty()),
+        vk::ImageLayout::GENERAL =>
+            (S::ALL_COMMANDS,   A::MEMORY_READ | A::MEMORY_WRITE),
+        vk::ImageLayout::TRANSFER_SRC_OPTIMAL =>
+            (S::TRANSFER,       A::TRANSFER_READ),
+        vk::ImageLayout::TRANSFER_DST_OPTIMAL =>
+            (S::TRANSFER,       A::TRANSFER_WRITE),
+        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL =>
+            (S::ALL_COMMANDS,   A::SHADER_READ),
+        vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL =>
+            (S::COLOR_ATTACHMENT_OUTPUT, A::COLOR_ATTACHMENT_READ | A::COLOR_ATTACHMENT_WRITE),
+        vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL =>
+            (S::EARLY_FRAGMENT_TESTS | S::LATE_FRAGMENT_TESTS,
+             A::DEPTH_STENCIL_ATTACHMENT_READ | A::DEPTH_STENCIL_ATTACHMENT_WRITE),
+        vk::ImageLayout::PRESENT_SRC_KHR =>
+            (S::BOTTOM_OF_PIPE, A::empty()),
+        _ =>
+            (S::ALL_COMMANDS,   A::MEMORY_READ | A::MEMORY_WRITE),
+    }
+}
+
 pub struct CommandBufferInner {
     device_dep: Arc<DeviceInner>,
     command_buffer: vk::CommandBuffer,
@@ -163,6 +188,12 @@ impl CommandBuffer {
                 &image_memory_barriers
             )
         }
+    }
+
+    pub fn transition(&mut self, image: &impl ImageTrait, old_layout: vk::ImageLayout, new_layout: vk::ImageLayout) {
+        let (src_stage, src_access) = layout_stage_access(old_layout);
+        let (dst_stage, dst_access) = layout_stage_access(new_layout);
+        self.image_barrier(image, old_layout, new_layout, src_stage, dst_stage, src_access, dst_access);
     }
 
     pub fn image_barrier<'a>(

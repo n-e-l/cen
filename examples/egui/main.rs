@@ -106,41 +106,17 @@ impl RenderComponent for EguiExample {
 
         // Clear the texture
         let texture_image = ctx.images.get(&self.texture);
-        ctx.command_buffer.image_barrier(
-            texture_image,
-            vk::ImageLayout::UNDEFINED,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::AccessFlags::NONE,
-            vk::AccessFlags::TRANSFER_WRITE
-        );
+        ctx.command_buffer.transition(texture_image, vk::ImageLayout::UNDEFINED, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
         ctx.command_buffer.clear_color_image(
             texture_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             [0.0, 1.0, 0.0, 1.0]
         );
-        ctx.command_buffer.image_barrier(
-            texture_image,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-            vk::AccessFlags::TRANSFER_WRITE,
-            vk::AccessFlags::NONE
-        );
+        ctx.command_buffer.transition(texture_image, vk::ImageLayout::TRANSFER_DST_OPTIMAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
 
         let image = ctx.images.get(&self.image);
 
-        ctx.command_buffer.image_barrier(
-            image,
-            vk::ImageLayout::UNDEFINED,
-            vk::ImageLayout::GENERAL,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-            vk::AccessFlags::empty(),
-            vk::AccessFlags::empty()
-        );
+        ctx.command_buffer.transition(image, vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL);
 
         // Render
         let compute = if !self.pressed {
@@ -167,27 +143,8 @@ impl RenderComponent for EguiExample {
 
         ctx.command_buffer.dispatch(500, 500, 1 );
 
-        // Transition the render to a source
-        ctx.command_buffer.image_barrier(
-            image,
-            vk::ImageLayout::GENERAL,
-            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            vk::PipelineStageFlags::COMPUTE_SHADER,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::AccessFlags::SHADER_WRITE,
-            vk::AccessFlags::TRANSFER_READ
-        );
-
-        // Transition the swapchain image
-        ctx.command_buffer.image_barrier(
-            ctx.swapchain_image.unwrap(),
-            vk::ImageLayout::UNDEFINED,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::AccessFlags::NONE,
-            vk::AccessFlags::TRANSFER_WRITE
-        );
+        ctx.command_buffer.transition(image, vk::ImageLayout::GENERAL, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
+        ctx.command_buffer.transition(ctx.swapchain_image.unwrap(), vk::ImageLayout::UNDEFINED, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
 
         // Copy to the swapchain
         ctx.command_buffer.clear_color_image(
@@ -229,27 +186,8 @@ impl RenderComponent for EguiExample {
             vk::Filter::NEAREST,
         );
 
-        // Transfer back to default states
-        ctx.command_buffer.image_barrier(
-            ctx.swapchain_image.unwrap(),
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            vk::ImageLayout::PRESENT_SRC_KHR,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-            vk::AccessFlags::TRANSFER_WRITE,
-            vk::AccessFlags::NONE
-        );
-
-        // Transition the render image back
-        ctx.command_buffer.image_barrier(
-            image,
-            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            vk::ImageLayout::GENERAL,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-            vk::AccessFlags::TRANSFER_WRITE,
-            vk::AccessFlags::NONE
-        );
+        ctx.command_buffer.transition(ctx.swapchain_image.unwrap(), vk::ImageLayout::TRANSFER_DST_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR);
+        ctx.command_buffer.transition(image, vk::ImageLayout::TRANSFER_SRC_OPTIMAL, vk::ImageLayout::GENERAL);
 
     }
 }

@@ -1,59 +1,50 @@
-use cen::graphics::pipeline_store::{PipelineKey};
+use cen::graphics::pipeline_store::PipelineKey;
 use ash::vk;
 use ash::vk::{Extent3D, WriteDescriptorSet};
 use egui::Context;
 use winit::event::WindowEvent;
-use cen::app::Cen;
-use cen::app::app::{AppComponent, AppConfig};
-use cen::app::engine::InitContext;
-use cen::app::gui::{GuiComponent, GuiHandler};
-use cen::graphics::image_store::{ImageFlags, ImageKey};
-use cen::graphics::renderer::{RenderComponent, RenderContext};
-use cen::vulkan::{DescriptorSetLayout, ImageTrait, ImageConfig, Image, ComputePipelineConfig};
+use cen::app::app::{AppComponent, AppConfig, Cen};
+use cen::app::engine::CenContext;
+use cen::app::gui::{GuiComponent, GuiContext};
+use cen::app::{ImageFlags, ImageResource};
+use cen::graphics::renderer::RenderComponent;
+use cen::vulkan::{DescriptorSetLayout, ImageTrait, ImageConfig, ComputePipelineConfig};
 
 struct ComputeExample {
-    image: ImageKey,
+    image: ImageResource,
     _descriptorset: DescriptorSetLayout,
     pipeline: PipelineKey,
 }
 
 impl AppComponent for ComputeExample {
-    fn new(ctx: &mut InitContext) -> Self
-    where Self: Sized
-    {
-        // Image
-        let image = ctx.image_store.insert_with_flags(
-            ImageFlags::MATCH_SWAPCHAIN_EXTENT,
-            Image::new(
-                &ctx.device,
-                &mut ctx.allocator,
-                ImageConfig {
-                    extent: Extent3D {
-                        width: ctx.swapchain_extent.width,
-                        height: ctx.swapchain_extent.height,
-                        depth: 1
-                    },
-                    image_usage_flags: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
-                    ..Default::default()
-                }
-            )
+    fn new(ctx: &mut CenContext) -> Self {
+        let image = ctx.images.create(
+            ctx.gfx,
+            ImageConfig {
+                extent: Extent3D {
+                    width: 1,
+                    height: 1,
+                    depth: 1
+                },
+                image_usage_flags: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
+                ..Default::default()
+            },
+            ImageFlags::MATCH_SWAPCHAIN_EXTENT
         );
 
-        // Layout
         let layout_bindings = &[
             vk::DescriptorSetLayoutBinding::default()
                 .binding(0)
                 .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
                 .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::COMPUTE ),
+                .stage_flags(vk::ShaderStageFlags::COMPUTE),
         ];
         let descriptorset = DescriptorSetLayout::new_push_descriptor(
-            &ctx.device,
+            &ctx.gfx.device,
             layout_bindings
         );
 
-        // Pipeline
-        let pipeline = ctx.pipeline_store.insert(ComputePipelineConfig {
+        let pipeline = ctx.pipelines.create_pipeline(ComputePipelineConfig {
             shader_source: "examples/compute/shader.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
@@ -68,27 +59,16 @@ impl AppComponent for ComputeExample {
         }
     }
 
-    fn window_event(&mut self, _: WindowEvent) {
-    }
+    fn window_event(&mut self, _: WindowEvent) {}
 }
 
 impl RenderComponent for ComputeExample {
-    fn render(&mut self, ctx: &mut RenderContext) {
+    fn render(&mut self, ctx: &mut CenContext) {
+        let image = ctx.images.get(&self.image);
 
-        let image = ctx.image_store.get(self.image).expect("Image should exist");
+        ctx.command_buffer.transition(image, vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL);
 
-        ctx.command_buffer.image_barrier(
-            image,
-            vk::ImageLayout::UNDEFINED,
-            vk::ImageLayout::GENERAL,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-            vk::AccessFlags::empty(),
-            vk::AccessFlags::empty()
-        );
-
-        // Render
-        let compute = ctx.pipeline_store.get(self.pipeline).unwrap();
+        let compute = ctx.pipelines.get(self.pipeline).unwrap();
         ctx.command_buffer.bind_pipeline(compute);
 
         let bindings = [image.binding(vk::ImageLayout::GENERAL)];
@@ -104,42 +84,24 @@ impl RenderComponent for ComputeExample {
             0,
             &[write_descriptor_set]
         );
-        ctx.command_buffer.dispatch(500, 500, 1 );
+        ctx.command_buffer.dispatch(500, 500, 1);
 
-        // Transition the render to a source
-        ctx.command_buffer.image_barrier(
-            image,
-            vk::ImageLayout::GENERAL,
-            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            vk::PipelineStageFlags::COMPUTE_SHADER,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::AccessFlags::SHADER_WRITE,
-            vk::AccessFlags::TRANSFER_READ
-        );
+        ctx.command_buffer.transition(image, vk::ImageLayout::GENERAL, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
 
-        // Transition the swapchain image
-        ctx.command_buffer.image_barrier(
-            ctx.swapchain_image,
-            vk::ImageLayout::PRESENT_SRC_KHR,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::AccessFlags::NONE,
-            vk::AccessFlags::TRANSFER_WRITE
-        );
+        let swapchain_image = ctx.swapchain_image.unwrap();
 
-        // Copy to the swapchain
+        ctx.command_buffer.transition(swapchain_image, vk::ImageLayout::PRESENT_SRC_KHR, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
+
         ctx.command_buffer.clear_color_image(
-            ctx.swapchain_image,
+            swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             [0.0, 0.0, 0.0, 1.0]
         );
 
-        // Use a blit, as a copy doesn't synchronize properly to the swapchain on MoltenVK
         ctx.command_buffer.blit_image(
             image,
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            ctx.swapchain_image,
+            swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             &[vk::ImageBlit::default()
                 .src_offsets([
@@ -168,33 +130,13 @@ impl RenderComponent for ComputeExample {
             vk::Filter::NEAREST,
         );
 
-        // Transfer back to default states
-        ctx.command_buffer.image_barrier(
-            ctx.swapchain_image,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            vk::ImageLayout::PRESENT_SRC_KHR,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-            vk::AccessFlags::TRANSFER_WRITE,
-            vk::AccessFlags::NONE
-        );
-
-        // Transition the render image back
-        ctx.command_buffer.image_barrier(
-            image,
-            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            vk::ImageLayout::GENERAL,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-            vk::AccessFlags::TRANSFER_WRITE,
-            vk::AccessFlags::NONE
-        );
-
+        ctx.command_buffer.transition(swapchain_image, vk::ImageLayout::TRANSFER_DST_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR);
+        ctx.command_buffer.transition(image, vk::ImageLayout::TRANSFER_SRC_OPTIMAL, vk::ImageLayout::GENERAL);
     }
 }
 
 impl GuiComponent for ComputeExample {
-    fn gui(&mut self, _: &mut GuiHandler, _: &Context) {}
+    fn gui(&mut self, _: &mut GuiContext, _: &Context) {}
 }
 
 fn main() {
