@@ -6,7 +6,9 @@ use crate::app::app::{AppComponent, AppConfig, UserEvent};
 use crate::app::gui::{GuiComponent, GuiSystem};
 use crate::app::{Window};
 use crate::graphics::{Renderer};
-use crate::graphics::renderer::{GraphicsContext, ImageContext, PipelineContext, RenderComponent, WindowState};
+use crate::graphics::{GraphicsContext, ImageContext, PipelineContext};
+use crate::graphics::renderer::RenderComponent;
+use crate::vulkan::WindowState;
 use crate::vulkan::{CommandBuffer, ImageTrait, SwapchainImage};
 
 /**

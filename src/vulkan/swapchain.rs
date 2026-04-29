@@ -3,7 +3,7 @@ use ash::khr::swapchain;
 use ash::vk;
 use ash::vk::{CompositeAlphaFlagsKHR, ImageUsageFlags, PresentModeKHR, SharingMode, SurfaceFormatKHR, SwapchainKHR};
 use log::{debug, info};
-use crate::graphics::renderer::WindowState;
+use crate::vulkan::window_state::WindowState;
 use crate::vulkan;
 use crate::vulkan::{Device, ImageTrait, Instance, Surface, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;

@@ -1,5 +1,6 @@
 use crate::app::{ImageResource, Window};
-use crate::graphics::renderer::{GraphicsContext, ImageContext, RenderComponent};
+use crate::graphics::{GraphicsContext, ImageContext};
+use crate::graphics::renderer::RenderComponent;
 use crate::graphics::Renderer;
 use crate::vulkan::memory::GpuResource;
 use crate::vulkan::{DescriptorPool, Device, ImageTrait};

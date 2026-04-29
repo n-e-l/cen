@@ -1,75 +1,17 @@
 use log::{info};
 use std::time::Instant;
 use ash::vk;
-use ash::vk::{Extent2D, ImageLayout, PhysicalDevice, Queue};
+use ash::vk::{ImageLayout, PhysicalDevice};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
-use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
 use crate::app::engine::{CenContext};
-use std::sync::Arc;
-use crate::app::{ImageFlags, ImageResource};
+use crate::app::{ImageFlags};
 use crate::app::gui::{GuiData, GuiSystem};
+use crate::graphics::context::{GraphicsContext, ImageContext, PipelineContext};
 use crate::graphics::image_store::ImageStore;
-use crate::graphics::pipeline_store::{IntoPipelineHandle, PipelineKey, PipelineStore};
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, ImageConfig, Instance, Pipeline, PipelineErr, Surface, Swapchain};
-
-// -- Window --
-
-pub struct WindowState<'a> {
-    pub window_handle: WindowHandle<'a>,
-    pub display_handle: DisplayHandle<'a>,
-    pub extent2d: Extent2D,
-    pub scale_factor: f64,
-}
-
-// -- Contexts --
-
-pub struct GraphicsContext {
-    pub command_pool: CommandPool,
-    pub queue: Queue,
-    pub allocator: Allocator,
-    pub device: Device,
-}
-
-pub struct ImageContext {
-    pub image_store: ImageStore,
-    pub images: Vec<(ImageResource, ImageFlags)>,
-}
-
-impl ImageContext {
-
-    pub fn create(&mut self, gfx: &mut GraphicsContext, config: ImageConfig, flags: ImageFlags) -> ImageResource {
-        let image_key = self.image_store.insert(Image::new(&gfx.device, &mut gfx.allocator, config));
-        let resource = ImageResource::new(image_key);
-        self.images.push((resource.clone(), flags));
-        resource
-
-    }
-
-    pub fn get(&self, resource: &ImageResource) -> &Image {
-        self.image_store.get(&resource.image_key())
-    }
-
-    pub(crate) fn cleanup(&mut self) {
-        self.images.retain(|(resource, _)| Arc::strong_count(&resource.0) > 1);
-        self.image_store.cleanup();
-    }
-}
-
-pub struct PipelineContext {
-    pub pipeline_store: PipelineStore,
-}
-
-impl PipelineContext {
-    pub fn get(&self, key: PipelineKey) -> Option<&dyn Pipeline> {
-        self.pipeline_store.get(key)
-    }
-
-    pub fn create_pipeline(&mut self, handle: impl IntoPipelineHandle) -> Result<PipelineKey, PipelineErr> {
-        self.pipeline_store.insert(handle)
-    }
-}
+use crate::graphics::pipeline_store::PipelineStore;
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, Instance, Surface, Swapchain, WindowState};
 
 // -- Traits --
 

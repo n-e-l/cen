@@ -1,4 +1,5 @@
 pub(crate) mod device;
+mod window_state;
 mod instance;
 mod surface;
 mod swapchain;
@@ -35,6 +36,7 @@ pub use self::image::SwapchainImage;
 pub use self::image::Image;
 pub use self::image::ImageConfig;
 pub use self::instance::Instance;
+pub use self::window_state::WindowState;
 pub use self::surface::Surface;
 pub use self::swapchain::Swapchain;
 pub use self::pipeline::Pipeline;

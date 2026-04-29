@@ -7,7 +7,7 @@ use std::{ptr, vec};
 use std::sync::Arc;
 use ash::khr::surface;
 use log::{debug, error, info, warn};
-use crate::graphics::renderer::WindowState;
+use crate::vulkan::window_state::WindowState;
 use crate::vulkan::LOG_TARGET;
 use crate::vulkan::surface::Surface;
 
