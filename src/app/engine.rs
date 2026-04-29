@@ -9,7 +9,7 @@ use crate::graphics::{Renderer};
 use crate::graphics::{GraphicsContext, ImageContext, PipelineContext};
 use crate::graphics::renderer::RenderComponent;
 use crate::vulkan::{ImageConfig, WindowState};
-use crate::vulkan::{CommandBuffer, ImageTrait, SwapchainImage};
+use crate::vulkan::{CommandBuffer, SwapchainImage};
 
 /**
  * Cen engine

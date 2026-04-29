@@ -19,7 +19,7 @@ use crate::graphics::image_store::{ImageKey, ImageStore};
 
 #[derive(Clone)]
 #[derive(Eq, Hash, PartialEq)]
-pub(crate) struct TextureHandle {
+pub struct TextureHandle {
     pub(crate) image_key: ImageKey,
     pub(crate) id: TextureId
 }
