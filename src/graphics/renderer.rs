@@ -7,7 +7,8 @@ use winit::event_loop::EventLoopProxy;
 use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
 use crate::app::engine::{CenContext};
-use crate::app::{ImageFlags, ImageResource, ResourceStore};
+use std::sync::Arc;
+use crate::app::{ImageFlags, ImageResource};
 use crate::app::gui::{GuiData, GuiSystem};
 use crate::graphics::image_store::ImageStore;
 use crate::graphics::pipeline_store::{IntoPipelineHandle, PipelineKey, PipelineStore};
@@ -33,23 +34,25 @@ pub struct GraphicsContext {
 
 pub struct ImageContext {
     pub image_store: ImageStore,
-    pub resource_store: ResourceStore,
+    pub images: Vec<(ImageResource, ImageFlags)>,
 }
 
 impl ImageContext {
 
     pub fn create(&mut self, gfx: &mut GraphicsContext, config: ImageConfig, flags: ImageFlags) -> ImageResource {
         let image_key = self.image_store.insert(Image::new(&gfx.device, &mut gfx.allocator, config));
-        self.resource_store.insert(image_key, flags)
+        let resource = ImageResource::new(image_key);
+        self.images.push((resource.clone(), flags));
+        resource
+
     }
 
-    pub fn get(& self, resource: &ImageResource) -> &Image
-    {
+    pub fn get(&self, resource: &ImageResource) -> &Image {
         self.image_store.get(&resource.image_key())
     }
 
     pub(crate) fn cleanup(&mut self) {
-        self.resource_store.cleanup();
+        self.images.retain(|(resource, _)| Arc::strong_count(&resource.0) > 1);
         self.image_store.cleanup();
     }
 }
@@ -147,11 +150,10 @@ impl Renderer {
             pipeline_store
         };
 
-        let resource_store = ResourceStore::new();
         let image_store = ImageStore::new();
         let image_context = ImageContext {
             image_store,
-            resource_store
+            images: Vec::new(),
         };
 
         let graphics_context = GraphicsContext {
@@ -185,13 +187,11 @@ impl Renderer {
         info!("Recreating swapchain");
         self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.graphics_context.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
 
-        // Collect keys and flags first, releasing the borrow on resource_store
-        let resizeable: Vec<_> = self.image_context.resource_store
-            .entries_mut()
-            .into_iter()
+        let resizeable: Vec<_> = self.image_context.images
+            .iter()
             .filter_map(|(resource, flags)| {
                 if flags.contains(ImageFlags::MATCH_SWAPCHAIN_EXTENT) {
-                    Some(resource.clone()) // or whatever handle/key you need
+                    Some(resource.clone())
                 } else {
                     None
                 }

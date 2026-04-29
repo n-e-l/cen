@@ -4,10 +4,10 @@ use ash::vk::{Extent3D, WriteDescriptorSet};
 use egui::{Context, Slider};
 use winit::event::WindowEvent;
 use cen::app::app::{AppComponent, AppConfig, Cen};
-use cen::app::gui::{GuiComponent, GuiContext, GuiData, GuiSystem};
+use cen::app::gui::{GuiComponent, GuiContext};
 use cen::app::engine::{CenContext};
 use cen::app::{ImageFlags, ImageResource};
-use cen::graphics::renderer::{ImageContext, RenderComponent};
+use cen::graphics::renderer::{RenderComponent};
 use cen::vulkan::{DescriptorSetLayout, ImageTrait, ImageConfig, ComputePipelineConfig};
 
 #[allow(dead_code)]
@@ -266,7 +266,7 @@ impl GuiComponent for EguiExample {
                 ui.add(Slider::new(&mut self.slider, 10..=1000));
 
                 let size = gui.images.get(&self.texture).extent();
-                if(size.width != self.slider ) {
+                if size.width != self.slider  {
                     self.texture = gui.images.create(
                         gui.gfx,
                         ImageConfig {
