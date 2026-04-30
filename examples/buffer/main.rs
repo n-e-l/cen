@@ -3,11 +3,10 @@ use ash::vk::{BufferImageCopy, BufferUsageFlags, DeviceSize, Extent3D, ImageLayo
 use egui::Context;
 use gpu_allocator::MemoryLocation;
 use winit::event::WindowEvent;
-use cen::app::Cen;
-use cen::app::app::{AppComponent, AppConfig};
-use cen::app::engine::InitContext;
-use cen::app::gui::{GuiComponent, GuiHandler};
-use cen::graphics::renderer::{RenderComponent, RenderContext};
+use cen::app::app::{AppComponent, AppConfig, Cen};
+use cen::app::engine::CenContext;
+use cen::app::gui::{GuiComponent, GuiContext};
+use cen::graphics::renderer::RenderComponent;
 use cen::vulkan::{Buffer, ImageTrait};
 
 struct BufferExample {
@@ -15,11 +14,10 @@ struct BufferExample {
 }
 
 impl AppComponent for BufferExample {
-    fn new(ctx: &mut InitContext) -> Self {
-        // Image
+    fn new(ctx: &mut CenContext) -> Self {
         let buffer = Buffer::new(
-            &ctx.device,
-            &mut ctx.allocator,
+            &ctx.gfx.device,
+            &mut ctx.gfx.allocator,
             MemoryLocation::CpuToGpu,
             2000 * 2000 * 4,
             BufferUsageFlags::TRANSFER_SRC
@@ -32,26 +30,22 @@ impl AppComponent for BufferExample {
             }
         }
 
-        Self {
-            buffer
-        }
+        Self { buffer }
     }
 
-    fn window_event(&mut self, _: WindowEvent) {
-    }
+    fn window_event(&mut self, _: WindowEvent) {}
 }
 
 impl RenderComponent for BufferExample {
+    fn render(&mut self, ctx: &mut CenContext) {
+        let swapchain_image = ctx.swapchain_image.unwrap();
 
-    fn render(&mut self, ctx: &mut RenderContext) {
-
-        if self.buffer.size() != (ctx.swapchain_image.width() * ctx.swapchain_image.height() * 4) as u64 {
-            // Recreate image
+        if self.buffer.size() != (swapchain_image.width() * swapchain_image.height() * 4) as u64 {
             self.buffer = Buffer::new(
-                &ctx.device,
-                &mut ctx.allocator,
+                &ctx.gfx.device,
+                &mut ctx.gfx.allocator,
                 MemoryLocation::CpuToGpu,
-                (ctx.swapchain_image.width() * ctx.swapchain_image.height() * 4) as DeviceSize,
+                (swapchain_image.width() * swapchain_image.height() * 4) as DeviceSize,
                 BufferUsageFlags::TRANSFER_SRC
             );
 
@@ -63,27 +57,17 @@ impl RenderComponent for BufferExample {
             }
         }
 
-        // Transition the swapchain image
-        ctx.command_buffer.image_barrier(
-            ctx.swapchain_image,
-            vk::ImageLayout::PRESENT_SRC_KHR,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::AccessFlags::NONE,
-            vk::AccessFlags::TRANSFER_WRITE
-        );
+        ctx.command_buffer.transition(swapchain_image, vk::ImageLayout::PRESENT_SRC_KHR, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
 
-        // Copy to the swapchain
         ctx.command_buffer.clear_color_image(
-            ctx.swapchain_image,
+            swapchain_image,
             ImageLayout::TRANSFER_DST_OPTIMAL,
             [1.0, 0.0, 0.0, 1.0]
         );
 
         ctx.command_buffer.copy_buffer_to_image(
             &self.buffer,
-            ctx.swapchain_image,
+            swapchain_image,
             ImageLayout::TRANSFER_DST_OPTIMAL,
             &[
                 BufferImageCopy::default()
@@ -92,8 +76,8 @@ impl RenderComponent for BufferExample {
                     .buffer_offset(0)
                     .image_extent(
                         Extent3D::default()
-                            .width(ctx.swapchain_image.width())
-                            .height(ctx.swapchain_image.height())
+                            .width(swapchain_image.width())
+                            .height(swapchain_image.height())
                             .depth(1)
                     )
                     .image_subresource(
@@ -106,25 +90,14 @@ impl RenderComponent for BufferExample {
             ]
         );
 
-        // Transfer back to default states
-        ctx.command_buffer.image_barrier(
-            ctx.swapchain_image,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            vk::ImageLayout::PRESENT_SRC_KHR,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-            vk::AccessFlags::TRANSFER_WRITE,
-            vk::AccessFlags::NONE
-        );
-
+        ctx.command_buffer.transition(swapchain_image, vk::ImageLayout::TRANSFER_DST_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR);
     }
 }
 
 impl GuiComponent for BufferExample {
-    fn gui(&mut self, _: &mut GuiHandler, _: &Context) {}
+    fn gui(&mut self, _: &mut GuiContext, _: &Context) {}
 }
 
 fn main() {
     Cen::<BufferExample>::run(AppConfig::default());
 }
-

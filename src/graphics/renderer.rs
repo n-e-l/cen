@@ -1,67 +1,37 @@
 use log::{info};
 use std::time::Instant;
 use ash::vk;
-use ash::vk::{Extent2D, ImageLayout, PhysicalDevice, Queue};
+use ash::vk::{ImageLayout, PhysicalDevice};
 use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
-use winit::raw_window_handle::{DisplayHandle, WindowHandle};
 use crate::app::app::UserEvent;
+use crate::app::engine::{CenContext};
+use crate::app::ImageFlags;
+use crate::app::gui::{GuiData, GuiSystem};
+use crate::graphics::context::{GraphicsContext, ImageContext, PipelineContext};
 use crate::graphics::image_store::ImageStore;
 use crate::graphics::pipeline_store::PipelineStore;
-use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Instance, Surface, Swapchain, SwapchainImage};
-
-// -- Window --
-
-pub struct WindowState<'a> {
-    pub window_handle: WindowHandle<'a>,
-    pub display_handle: DisplayHandle<'a>,
-    pub extent2d: Extent2D,
-    pub scale_factor: f64,
-}
-
-// -- Contexts --
-
-pub struct RenderContext<'a> {
-    pub device: &'a Device,
-    pub allocator: &'a mut Allocator,
-    pub pipeline_store: &'a mut PipelineStore,
-    pub image_store: &'a mut ImageStore,
-    pub command_buffer: &'a mut CommandBuffer,
-    pub swapchain_image: &'a SwapchainImage,
-    pub queue: &'a Queue,
-    pub command_pool: &'a CommandPool,
-    on_finish: &'a mut Vec<Box<dyn FnOnce()>>
-}
-
-impl RenderContext<'_> {
-    pub fn run_on_finish(&mut self, fun: Box<dyn FnOnce()>) {
-        self.on_finish.push(fun);
-    }
-}
+use crate::vulkan::{Allocator, CommandBuffer, CommandPool, Device, Image, Instance, Surface, Swapchain, WindowState};
 
 // -- Traits --
 
 pub trait RenderComponent {
-    fn render(&mut self, ctx: &mut RenderContext);
+    fn render(&mut self, ctx: &mut CenContext);
 }
 
 // -- Renderer --
 
 pub struct Renderer {
-    pub pipeline_store: PipelineStore,
-    pub image_store: ImageStore,
     pub render_finished_semaphores: Vec<vk::Semaphore>,
     pub image_available_semaphores: Vec<vk::Semaphore>,
     pub command_buffers: Vec<CommandBuffer>,
-    pub on_finish_functions: Vec<Vec<Box<dyn FnOnce()>>>,
-    pub command_pool: CommandPool,
-    pub queue: Queue,
     pub swapchain: Swapchain,
     pub entry: ash::Entry,
     pub surface: Surface,
     pub frame_index: usize,
-    pub allocator: Allocator,
-    pub device: Device,
+    pub graphics_context: GraphicsContext,
+    pub image_context: ImageContext,
+    pub pipeline_context: PipelineContext,
     pub physical_device: PhysicalDevice,
     pub instance: Instance,
     pub start_time: Instant,
@@ -115,53 +85,89 @@ impl Renderer {
                 .expect("Failed to create semaphore")
         }).collect::<Vec<vk::Semaphore>>();
 
-        let on_finish_functions = (0..swapchain.get_image_count()).map(|_| {
-            vec![]
-        }).collect::<Vec<Vec<Box<dyn FnOnce()>>>>();
+        let start_time = std::time::Instant::now();
 
         let pipeline_store = PipelineStore::new( &device, proxy );
-        let image_store = ImageStore::default();
+        let pipeline_context = PipelineContext {
+            pipeline_store
+        };
 
-        let start_time = std::time::Instant::now();
+        let image_store = ImageStore::new();
+        let image_context = ImageContext {
+            image_store,
+            images: Vec::new(),
+        };
+
+        let graphics_context = GraphicsContext {
+            device,
+            allocator,
+            queue,
+            command_pool,
+        };
 
         Self {
             entry,
-            device,
+            graphics_context,
+            image_context,
+            pipeline_context,
             physical_device,
             instance,
-            allocator,
             surface,
-            queue,
             swapchain,
             render_finished_semaphores,
             image_available_semaphores,
-            command_pool,
             command_buffers,
-            on_finish_functions,
-            pipeline_store,
-            image_store,
             frame_index: 0,
             start_time,
             present_mode,
         }
     }
 
-    pub(crate) fn on_window_recreation(&mut self, window_state: WindowState) {
-        self.device.wait_idle();
+    pub(crate) fn on_window_recreation(&mut self, gui_data: &mut GuiData, window_state: WindowState) {
+
+        self.graphics_context.device.wait_idle();
         info!("Recreating swapchain");
-        self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
+        self.swapchain = Swapchain::new(&self.instance, &self.physical_device, &self.graphics_context.device, &window_state, &self.surface, self.present_mode, Some(self.swapchain.handle()));
 
-        // Update all subscribed images with the new resolution
-        let _updated_keys = self.image_store.on_swapchain_resize(&self.device, &mut self.allocator, window_state.extent2d);
+        let resizeable: Vec<_> = self.image_context.images
+            .iter()
+            .filter_map(|(resource, flags)| {
+                if flags.contains(ImageFlags::MATCH_SWAPCHAIN_EXTENT) {
+                    resource.upgrade()
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-        // TODO: Update all linked textures
+        for resource in resizeable {
+            let image = self.image_context.image_store.get(&resource.image_key());
+            let mut config = image.config();
+            config.extent.width = self.swapchain.get_extent().width;
+            config.extent.height = self.swapchain.get_extent().height;
+
+            let image_key = self.image_context.image_store.insert(
+                Image::new(&self.graphics_context.device, &mut self.graphics_context.allocator, config)
+            );
+
+            resource.set_image_key(image_key.clone());
+            if resource.texture_key().is_some() {
+                let texture = gui_data.create_texture(&mut self.image_context.image_store, image_key).unwrap();
+                resource.set_texture_key(texture);
+            }
+        }
     }
 
-    fn record_command_buffer(&mut self, frame_index: usize, image_index: usize, render_components: &mut [&mut dyn RenderComponent]) {
+    fn record_command_buffer<'a>(&mut self, gui: &mut GuiSystem, frame_index: usize, image_index: usize, render_components: &mut [&mut dyn RenderComponent]) {
 
         let mut command_buffer = self.command_buffers[frame_index].clone();
 
         command_buffer.begin();
+
+        // Store any used textures in the command buffer lifetime
+        gui.take_used_textures().iter().for_each(|tex| {
+            command_buffer.track(tex);
+        });
 
         let swapchain_image = &self.swapchain.get_images()[image_index];
 
@@ -186,51 +192,54 @@ impl Renderer {
             vk::AccessFlags::empty(),
         );
 
-        let mut ctx = RenderContext {
-            device: &self.device,
-            allocator: &mut self.allocator,
-            pipeline_store: &mut self.pipeline_store,
-            image_store: &mut self.image_store,
+        let mut ctx = CenContext {
+            gfx: &mut self.graphics_context,
+            images: &mut self.image_context,
+            pipelines: &mut self.pipeline_context,
             command_buffer: &mut command_buffer,
-            swapchain_image,
-            queue: &self.queue,
-            command_pool: &self.command_pool,
-            on_finish: &mut self.on_finish_functions[frame_index]
+            swapchain_image: Some(swapchain_image),
         };
 
         for rc in render_components.iter_mut() {
             rc.render( &mut ctx );
         }
 
+        ctx = CenContext {
+            gfx: &mut self.graphics_context,
+            images: &mut self.image_context,
+            pipelines: &mut self.pipeline_context,
+            command_buffer: &mut command_buffer,
+            swapchain_image: Some(swapchain_image),
+        };
+        gui.render( &mut ctx );
+
         command_buffer.end();
     }
 
-    pub fn draw_frame(&mut self, render_components: &mut [&mut dyn RenderComponent]) {
+    pub fn draw_frame<'a>(&mut self, gui: &mut GuiSystem, render_components: &mut [&mut dyn RenderComponent]) {
+
+        // Clean up the stores
+        self.image_context.cleanup();
 
         // Wait for the current frame's command buffer to finish executing.
         let fence = self.command_buffers[self.frame_index].fence();
-        self.device.wait_for_fence(fence);
-
-        // Run the finish functions
-        for f in self.on_finish_functions[self.frame_index].drain(..) {
-            f();
-        }
+        self.graphics_context.device.wait_for_fence(fence);
 
         // Acquire image and signal the semaphore
         let image_index = self.swapchain.acquire_next_image(self.image_available_semaphores[self.frame_index]) as usize;
 
-        self.record_command_buffer(self.frame_index, image_index, render_components);
+        self.record_command_buffer(gui, self.frame_index, image_index, render_components);
 
-        self.device.reset_fence(fence);
-        self.device.submit_command_buffer(
-            &self.queue,
+        self.graphics_context.device.reset_fence(fence);
+        self.graphics_context.device.submit_command_buffer(
+            &self.graphics_context.queue,
             self.image_available_semaphores[self.frame_index],
             self.render_finished_semaphores[image_index],
             &self.command_buffers[self.frame_index]
         );
 
         self.swapchain.queue_present(
-            self.queue,
+            self.graphics_context.queue,
             self.render_finished_semaphores[image_index],
             image_index as u32
         );
@@ -238,28 +247,24 @@ impl Renderer {
         self.frame_index = ( self.frame_index + 1 ) % self.swapchain.get_image_views().len();
     }
 
-    pub fn pipeline_store(&mut self) -> &mut PipelineStore {
-        &mut self.pipeline_store
-    }
-
     pub fn submit_single_time_command_buffer(&mut self, command_buffer: CommandBuffer) {
-        self.device.submit_single_time_command(
-            self.queue,
+        self.graphics_context.device.submit_single_time_command(
+            self.graphics_context.queue,
             &command_buffer
         );
-        self.device.wait_for_fence(command_buffer.fence());
+        self.graphics_context.device.wait_for_fence(command_buffer.fence());
     }
 }
 
 impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
-            self.device.handle().device_wait_idle().unwrap();
+            self.graphics_context.device.handle().device_wait_idle().unwrap();
             for semaphore in &self.render_finished_semaphores {
-                self.device.handle().destroy_semaphore(*semaphore, None);
+                self.graphics_context.device.handle().destroy_semaphore(*semaphore, None);
             }
             for semaphore in &self.image_available_semaphores {
-                self.device.handle().destroy_semaphore(*semaphore, None);
+                self.graphics_context.device.handle().destroy_semaphore(*semaphore, None);
             }
         }
     }

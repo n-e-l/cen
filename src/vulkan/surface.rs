@@ -2,7 +2,7 @@ use ash::khr::surface;
 use ash::vk;
 use ash::vk::{PresentModeKHR, SurfaceCapabilitiesKHR, SurfaceKHR};
 use log::trace;
-use crate::graphics::renderer::WindowState;
+use crate::vulkan::window_state::WindowState;
 use crate::vulkan::{Instance, LOG_TARGET};
 
 /// A presentation surface for rendering graphics to a window.

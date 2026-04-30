@@ -1,27 +1,26 @@
-use ash::vk::Extent2D;
-use bitflags::bitflags;
+use std::sync::{Arc, Weak};
 use slotmap::{new_key_type, SlotMap};
-use crate::vulkan::{Allocator, Device, Image, ImageConfig};
+use crate::vulkan::Image;
 
-bitflags! {
-    #[derive(Clone, Copy, Debug, Default)]
-    pub struct ImageFlags: u32 {
-        const MATCH_SWAPCHAIN_EXTENT = 1 << 0;
-    }
+new_key_type! { pub struct ImageId; }
+
+pub struct StoredImage {
+    pub image: Image,
+    // A reference counted imageId, keeps track of external use of the image
+    handle: Weak<ImageId>
 }
 
-struct StoredImage {
-    image: Image,
-    flags: ImageFlags
-}
+#[derive(Clone)]
+#[derive(Eq, Hash, PartialEq)]
+pub struct ImageKey(Arc<ImageId>);
 
-new_key_type! { pub struct ImageKey; }
+/// Manages internal images
 pub struct ImageStore {
-    images: SlotMap<ImageKey, StoredImage>
+    images: SlotMap<ImageId, StoredImage>
 }
 
-impl Default for ImageStore {
-    fn default() -> Self {
+impl ImageStore {
+    pub(crate) fn new() -> Self {
         Self {
             images: SlotMap::default()
         }
@@ -30,51 +29,30 @@ impl Default for ImageStore {
 
 impl ImageStore {
     pub fn insert(&mut self, image: Image) -> ImageKey {
-        self.images.insert(StoredImage {
+        let id = self.images.insert(StoredImage {
             image,
-            flags: ImageFlags::empty()
-        })
+            handle: Weak::new()
+        });
+
+        let key: ImageKey = ImageKey(Arc::new(id));
+
+        // Update the handle to do reference counting
+        self.images.get_mut(id).unwrap().handle = Arc::downgrade(&key.0);
+
+        key
     }
 
-    pub fn insert_with_flags(&mut self, flags: ImageFlags, image: Image) -> ImageKey {
-        self.images.insert(StoredImage {
-            image,
-            flags
-        })
+    pub fn get(&self, key: &ImageKey) -> &Image {
+        self.images.get(*key.0).map(|s| &s.image).unwrap()
     }
 
-    pub fn get(&self, key: ImageKey) -> Option<&Image> {
-        self.images.get(key).map(|s| &s.image)
+    pub fn get_handle(&self, key: &ImageKey) -> Option<&StoredImage> {
+        self.images.get(*key.0).map(|s| s)
     }
 
-    /**
-     * Update all images with the set flags
-     * @returns a list of updated image keys
-     */
-    pub(crate) fn on_swapchain_resize(&mut self, device: &Device, allocator: &mut Allocator, extent: Extent2D) -> Vec<ImageKey> {
-        self.images.iter_mut().filter_map(|(key, si)| {
-           if si.flags.contains(ImageFlags::MATCH_SWAPCHAIN_EXTENT) {
-               let mut config = si.image.config();
-               config.extent.width = extent.width;
-               config.extent.height = extent.height;
-               si.image = Image::new(device, allocator, config);
-               return Some(key)
-           }
-           None
-        }).collect::<Vec<_>>()
-    }
-
-    pub fn recreate(&mut self, device: &Device, allocator: &mut Allocator, key: ImageKey, mut fun: impl FnMut(ImageConfig) -> ImageConfig) -> Result<(), &'static str> {
-        if let Some(im) = self.images.get_mut(key) {
-            let mut config = im.image.config();
-            config = fun(config);
-            *im = StoredImage{
-                image: Image::new(device, allocator, config) ,
-                flags: im.flags
-            };
-            return Ok(())
-        }
-
-        Err("Key not found")
+    pub fn cleanup(&mut self) {
+        self.images.retain(|_, stored| {
+            stored.handle.strong_count() > 0
+        });
     }
 }

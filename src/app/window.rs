@@ -68,11 +68,8 @@ impl Window {
                         ..
                     },
                 ..
-            } => match key.as_ref() {
-                Key::Named(NamedKey::Escape) => {
-                    event_loop.exit();
-                },
-                _ => {}
+            } => if let Key::Named(NamedKey::Escape) = key.as_ref() {
+                event_loop.exit();
             },
             _ => {}
         }
