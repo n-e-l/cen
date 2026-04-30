@@ -43,7 +43,7 @@ impl AppComponent for ComputeExample {
             layout_bindings
         );
 
-        let pipeline = ctx.pipelines.create_pipeline(ComputePipelineConfig {
+        let pipeline = ctx.create_pipeline(ComputePipelineConfig {
             shader_source: "examples/compute/shader.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),

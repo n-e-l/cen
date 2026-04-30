@@ -66,7 +66,7 @@ impl AppComponent for EguiExample {
         );
 
         // Pipeline
-        let pipeline_a = ctx.pipelines.create_pipeline(ComputePipelineConfig {
+        let pipeline_a = ctx.create_pipeline(ComputePipelineConfig {
             shader_source: "examples/egui/shader_a.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),
@@ -75,7 +75,7 @@ impl AppComponent for EguiExample {
             macros: Default::default(),
         }).expect("Failed to create pipeline");
 
-        let pipeline_b = ctx.pipelines.create_pipeline(ComputePipelineConfig {
+        let pipeline_b = ctx.create_pipeline(ComputePipelineConfig {
             shader_source: "examples/egui/shader_b.comp".into(),
             descriptor_set_layouts: vec![
                 descriptorset.clone(),

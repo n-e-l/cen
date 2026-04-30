@@ -6,7 +6,7 @@ use gpu_allocator::vulkan::{AllocatorCreateDesc};
 use winit::event_loop::EventLoopProxy;
 use crate::app::app::UserEvent;
 use crate::app::engine::{CenContext};
-use crate::app::{ImageFlags};
+use crate::app::ImageFlags;
 use crate::app::gui::{GuiData, GuiSystem};
 use crate::graphics::context::{GraphicsContext, ImageContext, PipelineContext};
 use crate::graphics::image_store::ImageStore;
@@ -133,7 +133,7 @@ impl Renderer {
             .iter()
             .filter_map(|(resource, flags)| {
                 if flags.contains(ImageFlags::MATCH_SWAPCHAIN_EXTENT) {
-                    Some(resource.clone())
+                    resource.upgrade()
                 } else {
                     None
                 }
@@ -141,7 +141,7 @@ impl Renderer {
             .collect();
 
         for resource in resizeable {
-            let image = self.image_context.image_store.get(&resource.0.read().unwrap().image_key);
+            let image = self.image_context.image_store.get(&resource.image_key());
             let mut config = image.config();
             config.extent.width = self.swapchain.get_extent().width;
             config.extent.height = self.swapchain.get_extent().height;
@@ -150,10 +150,10 @@ impl Renderer {
                 Image::new(&self.graphics_context.device, &mut self.graphics_context.allocator, config)
             );
 
-            resource.0.write().unwrap().image_key = image_key.clone();
-
-            if let Some(texture) = &mut resource.0.write().unwrap().texture_key {
-                *texture = gui_data.create_texture(&mut self.image_context.image_store, image_key).unwrap();
+            resource.set_image_key(image_key.clone());
+            if resource.texture_key().is_some() {
+                let texture = gui_data.create_texture(&mut self.image_context.image_store, image_key).unwrap();
+                resource.set_texture_key(texture);
             }
         }
     }

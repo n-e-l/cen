@@ -8,7 +8,9 @@ use crate::app::{ImageFlags, ImageResource, Window};
 use crate::graphics::{Renderer};
 use crate::graphics::{GraphicsContext, ImageContext, PipelineContext};
 use crate::graphics::renderer::RenderComponent;
-use crate::vulkan::{ImageConfig, WindowState};
+use crate::graphics::pipeline_store::IntoPipelineHandle;
+use crate::graphics::pipeline_store::PipelineKey;
+use crate::vulkan::{ImageConfig, PipelineErr, WindowState};
 use crate::vulkan::{CommandBuffer, SwapchainImage};
 
 /**
@@ -37,7 +39,11 @@ pub struct CenContext<'a>
 
 impl CenContext<'_> {
     pub fn create_image(&mut self, config: ImageConfig, flags: ImageFlags) -> ImageResource {
-        self.images.create(self.gfx, config, flags)
+        self.images.create_image(self.gfx, config, flags)
+    }
+
+    pub fn create_pipeline(&mut self, handle: impl IntoPipelineHandle) -> Result<PipelineKey, PipelineErr> {
+        self.pipelines.create_pipeline(handle)
     }
 }
 

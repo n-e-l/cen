@@ -41,7 +41,7 @@ pub struct GuiContext<'a> {
 
 impl GuiContext<'_> {
     pub fn create_image(&mut self, config: ImageConfig, flags: ImageFlags) -> ImageResource {
-        self.images.create(self.gfx, config, flags)
+        self.images.create_image(self.gfx, config, flags)
     }
 }
 

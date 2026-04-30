@@ -1,6 +1,5 @@
-use std::sync::Arc;
 use ash::vk::Queue;
-use crate::app::{ImageFlags, ImageResource};
+use crate::app::{ImageFlags, ImageResource, WeakImageResource};
 use crate::graphics::image_store::ImageStore;
 use crate::graphics::pipeline_store::{IntoPipelineHandle, PipelineKey, PipelineStore};
 use crate::vulkan::{Allocator, CommandPool, Device, Image, ImageConfig, Pipeline, PipelineErr};
@@ -14,15 +13,15 @@ pub struct GraphicsContext {
 
 pub struct ImageContext {
     pub image_store: ImageStore,
-    pub images: Vec<(ImageResource, ImageFlags)>,
+    pub images: Vec<(WeakImageResource, ImageFlags)>,
 }
 
 impl ImageContext {
 
-    pub(crate) fn create(&mut self, gfx: &mut GraphicsContext, config: ImageConfig, flags: ImageFlags) -> ImageResource {
+    pub fn create_image(&mut self, gfx: &mut GraphicsContext, config: ImageConfig, flags: ImageFlags) -> ImageResource {
         let image_key = self.image_store.insert(Image::new(&gfx.device, &mut gfx.allocator, config));
         let resource = ImageResource::new(image_key);
-        self.images.push((resource.clone(), flags));
+        self.images.push((resource.downgrade(), flags));
         resource
     }
 
@@ -31,7 +30,7 @@ impl ImageContext {
     }
 
     pub(crate) fn cleanup(&mut self) {
-        self.images.retain(|(resource, _)| Arc::strong_count(&resource.0) > 1);
+        self.images.retain(|(resource, _)| resource.upgrade().is_some());
         self.image_store.cleanup();
     }
 }
