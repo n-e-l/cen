@@ -21,7 +21,13 @@ jobs:
       uses: jakoch/install-vulkan-sdk-action@v1.5.1
       with:
         install_lavapipe: true
-    
+
+    - name: Install Lavapipe
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y mesa-vulkan-drivers
+        echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json" >> $GITHUB_ENV
+
     - name: Build
       run: cargo build --verbose
 
