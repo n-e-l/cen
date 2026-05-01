@@ -26,13 +26,7 @@ jobs:
       run: |
         sudo apt-get update -y
         sudo apt-get install -y mesa-vulkan-drivers
-        echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json" >> $GITHUB_ENV
-
-    - name: Debug Vulkan
-      run: |
-        find /usr/share/vulkan -name "*.json" 2>/dev/null
-        echo "VK_ICD_FILENAMES=$VK_ICD_FILENAMES"
-        vulkaninfo --summary 2>&1 || true
+        echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json" >> $GITHUB_ENV
 
     - name: Build
       run: cargo build --verbose
