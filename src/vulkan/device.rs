@@ -188,7 +188,8 @@ impl Device {
 #[cfg(test)]
 mod tests {
     use crate::ash::Entry;
-use super::*;
+    use crate::vulkan::{CommandBuffer, CommandPool};
+    use super::*;
 
     #[test]
     fn create_logical_device() {
@@ -196,6 +197,24 @@ use super::*;
         let instance = Instance::new(&entry, None);
         let (physical_device, queue_family_index) = instance.create_physical_device_headless();
         let _device = Device::new(&instance, physical_device, queue_family_index);
+    }
+
+    #[test]
+    fn submit_command_buffer() {
+        let entry = Entry::linked();
+        let instance = Instance::new(&entry, None);
+        let (physical_device, queue_family_index) = instance.create_physical_device_headless();
+        let device = Device::new(&instance, physical_device, queue_family_index);
+
+        let pool = CommandPool::new(&device, queue_family_index);
+        let mut cmd = CommandBuffer::new(&device, &pool, false);
+
+        cmd.begin();
+        cmd.end();
+
+        let queue = device.get_queue(0);
+        device.submit_single_time_command(queue, &cmd);
+        device.wait_for_fence(cmd.fence());
     }
 
 }
