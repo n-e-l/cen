@@ -205,7 +205,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn create_headless_instance() {
+    fn create_instance() {
         let entry = Entry::linked();
         let _instance = Instance::new(&entry, None);
     }
