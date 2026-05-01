@@ -13,8 +13,8 @@ pub struct Surface {
 
 impl Surface {
     pub fn new(entry: &ash::Entry, instance: &Instance, window: &WindowState ) -> Surface {
-        let surface_loader = surface::Instance::new(entry, instance.handle());
 
+        let surface_loader = surface::Instance::new(entry, instance.handle());
         let surface = unsafe {
             ash_window::create_surface(
                 entry,

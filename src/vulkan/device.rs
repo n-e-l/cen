@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use ash::khr::swapchain;
-use ash::vk;
+use ash::{vk};
 use ash::vk::{PipelineStageFlags, Queue};
 use log::trace;
 use crate::vulkan::{CommandBuffer, Instance, LOG_TARGET};
@@ -183,4 +183,19 @@ impl Device {
             inner: self.inner.clone(),
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ash::Entry;
+use super::*;
+
+    #[test]
+    fn create_logical_device() {
+        let entry = Entry::linked();
+        let instance = Instance::new(&entry, None);
+        let (physical_device, queue_family_index) = instance.create_physical_device_headless();
+        let _device = Device::new(&instance, physical_device, queue_family_index);
+    }
+
 }

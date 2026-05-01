@@ -17,6 +17,12 @@
         rustToolchain = pkgs.rust-bin.stable."1.92.0".default.override {
           extensions = [ "rust-src" "clippy" "rustfmt" ];
         };
+        swiftshader = pkgs.swiftshader.overrideAttrs (old: {
+          postPatch = (old.postPatch or "") + ''
+            sed -i '1s/^/#include <cstdint>\n/' \
+              third_party/glslang/SPIRV/SpvBuilder.h
+          '';
+        });
       in
       {
         devShells.default = pkgs.mkShell {
@@ -37,6 +43,7 @@
 			glslang
 			spirv-tools
 			shaderc
+            mesa # for lavapipe
 
 			# Wayland
 			wayland
