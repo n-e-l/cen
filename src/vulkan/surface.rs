@@ -1,3 +1,4 @@
+use ash::ext::headless_surface;
 use ash::khr::surface;
 use ash::vk;
 use ash::vk::{PresentModeKHR, SurfaceCapabilitiesKHR, SurfaceKHR};
@@ -9,12 +10,14 @@ use crate::vulkan::{Instance, LOG_TARGET};
 pub struct Surface {
     surface: SurfaceKHR,
     surface_loader: surface::Instance,
+    headless_surface: SurfaceKHR,
+    headless_loader: headless_surface::Instance,
 }
 
 impl Surface {
     pub fn new(entry: &ash::Entry, instance: &Instance, window: &WindowState ) -> Surface {
-        let surface_loader = surface::Instance::new(entry, instance.handle());
 
+        let surface_loader = surface::Instance::new(entry, instance.handle());
         let surface = unsafe {
             ash_window::create_surface(
                 entry,
@@ -25,11 +28,21 @@ impl Surface {
             ).expect("Failed to get surface.")
         };
 
+        let headless_loader = headless_surface::Instance::new(&entry, instance.handle());
+        let headless_surface = unsafe {
+            headless_loader.create_headless_surface(
+                &vk::HeadlessSurfaceCreateInfoEXT::default(),
+                None,
+            ).unwrap()
+        };
+
         trace!(target: LOG_TARGET, "Created surface: {:?}", surface);
 
         Surface {
             surface,
             surface_loader,
+            headless_surface,
+            headless_loader
         }
     }
 

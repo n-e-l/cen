@@ -19,6 +19,8 @@ jobs:
 
     - name: Install Vulkan SDK
       uses: jakoch/install-vulkan-sdk-action@v1.4.0
+      with:
+        install_lavapipe: true
     
     - name: Build
       run: cargo build --verbose

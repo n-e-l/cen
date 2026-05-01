@@ -41,7 +41,7 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(window: &WindowState, proxy: EventLoopProxy<UserEvent>, vsync: bool) -> Renderer {
         let entry = ash::Entry::linked();
-        let instance = Instance::new(&entry, window);
+        let instance = Instance::new(&entry, Some(window));
         let surface = Surface::new(&entry, &instance, window);
         let (physical_device, queue_family_index) = instance.create_physical_device(&entry, &surface);
         let device = Device::new(&instance, physical_device, queue_family_index);

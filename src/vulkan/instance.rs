@@ -1,7 +1,7 @@
-use ash::ext::debug_utils;
+use ash::ext::{debug_utils, headless_surface};
 use ash::{Entry, vk};
 use ash::vk::{DebugUtilsMessengerEXT, PhysicalDevice};
-use std::ffi::{CStr, CString};
+use std::ffi::{c_char, CStr, CString};
 use std::os::raw::c_void;
 use std::{ptr, vec};
 use std::sync::Arc;
@@ -62,7 +62,7 @@ pub struct Instance {
 
 impl Instance {
 
-    pub fn new(entry: &Entry, window: &WindowState) -> Self {
+    pub fn new(entry: &Entry, window: Option<&WindowState>) -> Self {
         let app_name = CString::new("cen").unwrap();
         let engine_name = CString::new("Cen").unwrap();
         let app_info = vk::ApplicationInfo::default()
@@ -72,10 +72,21 @@ impl Instance {
             .api_version(vk::make_api_version(0, 1, 2, 0))
             .application_name(app_name.as_c_str());
 
-        let mut extension_names =
-            ash_window::enumerate_required_extensions(window.display_handle.as_raw())
-                .unwrap()
-                .to_vec();
+        let mut extension_names: Vec<*const c_char> = vec![];
+        if let Some(window) = window {
+            extension_names.extend_from_slice(ash_window::enumerate_required_extensions(window.display_handle.as_raw()).unwrap());
+        } else {
+            // Add headless extension
+            let available_extensions = unsafe { entry.enumerate_instance_extension_properties(None) }.unwrap();
+            let headless_supported = available_extensions.iter().any(|e| {
+                e.extension_name_as_c_str() == Ok(headless_surface::NAME)
+            });
+            if headless_supported {
+                extension_names.push(headless_surface::NAME.as_ptr());
+            } else {
+                panic!("Using a headless driver without headless support")
+            }
+        }
         extension_names.push(debug_utils::NAME.as_ptr());
         extension_names.push(ash::khr::get_physical_device_properties2::NAME.as_ptr());
 
@@ -145,7 +156,7 @@ impl Instance {
         let instance_inner = InstanceInner {
             instance,
             debug_utils,
-            debug_utils_messenger,
+            debug_utils_messenger
         };
 
         Self {
@@ -168,13 +179,25 @@ impl Instance {
                         .iter()
                         .enumerate()
                         .find_map(|(index, info)| {
+                            let device_type = unsafe {
+                                let props = self.handle().get_physical_device_properties(*physical_device);
+                                props.device_type
+                            };
+
+                            if device_type == vk::PhysicalDeviceType::CPU {
+                                // Accept cpu renderers
+                                return Some((*physical_device, index));
+                            }
+
+                            // The following call crashes on cpu devices
                             let supports_graphics_and_surface =
-                                info.queue_flags.contains(vk::QueueFlags::GRAPHICS)
-                                && surface_loader.get_physical_device_surface_support(
-                                    *physical_device,
-                                    index as u32,
-                                    *surface.handle()
-                                ).unwrap();
+                                unsafe {
+                                    surface_loader.get_physical_device_surface_support(
+                                        *physical_device,
+                                        index as u32,
+                                        *surface.handle()
+                                    ).expect("error")
+                                };
                             if supports_graphics_and_surface {
                                 Some((*physical_device, index))
                             } else {
@@ -191,5 +214,16 @@ impl Instance {
         &self.inner.instance
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_headless_instance() {
+        let entry = Entry::linked();
+        let _instance = Instance::new(&entry, None);
+    }
 }
 
