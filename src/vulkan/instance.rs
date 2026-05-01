@@ -153,6 +153,35 @@ impl Instance {
         }
     }
 
+    pub fn create_physical_device_headless(&self) -> (PhysicalDevice, u32) {
+        let physical_devices = unsafe {
+            self.handle()
+                .enumerate_physical_devices()
+                .expect("Failed to enumerate physical devices.")
+        };
+        let (physical_device, queue_family_index) = physical_devices
+            .iter()
+            .find_map(|physical_device| {
+                unsafe {
+                    self.handle().get_physical_device_queue_family_properties(*physical_device)
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, _info)| {
+
+                            let device_type = self.handle().get_physical_device_properties(*physical_device).device_type;
+                            if device_type == vk::PhysicalDeviceType::CPU {
+                                // Accept cpu renderers
+                                return Some((*physical_device, index));
+                            }
+
+                            None
+                        })
+                }
+            })
+            .expect("Couldn't find a suitable device.");
+        (physical_device, queue_family_index as u32)
+    }
+
     pub fn create_physical_device(&self, entry: &Entry, surface: &Surface) -> (PhysicalDevice, u32) {
         let physical_devices = unsafe {
             self.handle()
@@ -168,14 +197,6 @@ impl Instance {
                         .iter()
                         .enumerate()
                         .find_map(|(index, _info)| {
-                            let device_type = self.handle().get_physical_device_properties(*physical_device).device_type;
-
-                            if device_type == vk::PhysicalDeviceType::CPU {
-                                // Accept cpu renderers
-                                return Some((*physical_device, index));
-                            }
-
-                            // The following call crashes on cpu devices
                             let supports_graphics_and_surface =
                                 surface_loader.get_physical_device_surface_support(
                                     *physical_device,
@@ -208,6 +229,13 @@ mod tests {
     fn create_instance() {
         let entry = Entry::linked();
         let _instance = Instance::new(&entry, None);
+    }
+
+    #[test]
+    fn create_physical_device() {
+        let entry = Entry::linked();
+        let instance = Instance::new(&entry, None);
+        let _physical_device = instance.create_physical_device_headless();
     }
 }
 
