@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use ash::khr::swapchain;
-use ash::{vk, Entry};
+use ash::{vk};
 use ash::vk::{PipelineStageFlags, Queue};
 use log::trace;
 use crate::vulkan::{CommandBuffer, Instance, LOG_TARGET};
@@ -187,7 +187,8 @@ impl Device {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::ash::Entry;
+use super::*;
 
     #[test]
     fn create_logical_device() {
