@@ -73,6 +73,7 @@ impl AppComponent for EguiExample {
             ],
             push_constant_ranges: vec![],
             macros: Default::default(),
+            slang_modules: vec![]
         }).expect("Failed to create pipeline");
 
         let pipeline_b = ctx.create_pipeline(ComputePipelineConfig {
@@ -82,6 +83,7 @@ impl AppComponent for EguiExample {
             ],
             push_constant_ranges: vec![],
             macros: Default::default(),
+            slang_modules: vec![]
         }).expect("Failed to create pipeline");
 
         Self {

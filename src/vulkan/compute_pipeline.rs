@@ -8,7 +8,7 @@ use log::{trace};
 use crate::vulkan::{DescriptorSetLayout, Device, GpuHandle, Pipeline, LOG_TARGET};
 use crate::vulkan::device::DeviceInner;
 use crate::vulkan::memory::GpuResource;
-use crate::vulkan::pipeline::{create_shader_module, load_shader_code, PipelineErr};
+use crate::vulkan::pipeline::{create_shader_module, load_shader_code, load_slang_shader_code, PipelineErr, SlangModule};
 
 #[derive(Clone)]
 pub struct ComputePipelineConfig {
@@ -16,6 +16,7 @@ pub struct ComputePipelineConfig {
     pub descriptor_set_layouts: Vec<DescriptorSetLayout>,
     pub push_constant_ranges: Vec<vk::PushConstantRange>,
     pub macros: HashMap<String, String>,
+    pub slang_modules: Vec<SlangModule>,
 }
 
 impl Default for ComputePipelineConfig {
@@ -24,7 +25,8 @@ impl Default for ComputePipelineConfig {
             shader_source: "".into(),
             descriptor_set_layouts: vec![],
             push_constant_ranges: vec![],
-            macros: HashMap::new()
+            macros: HashMap::new(),
+            slang_modules: vec![],
         }
     }
 }
@@ -84,7 +86,11 @@ pub fn new(
     config: ComputePipelineConfig
 ) -> Result<Self, PipelineErr> {
 
-        let shader_code = load_shader_code(config.shader_source, &config.macros)?;
+        let shader_code = if config.shader_source.extension().map_or(false, |e| e == "slang") {
+            load_slang_shader_code(config.shader_source, &config.slang_modules)?
+        } else {
+            load_shader_code(config.shader_source, &config.macros)?
+        };
         let shader_module = create_shader_module(device.handle(), shader_code.to_vec());
 
         let binding = CString::new("main").unwrap();

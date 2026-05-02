@@ -15,6 +15,7 @@ ash = { version = "0.38.0", features = ["linked"] }
 ash-window = "0.13.0"
 winit = "0.30.8"
 shaderc = { version = "0.8.3" }
+shader-slang = { git = "https://github.com/n-e-l/slang-rs" }
 log = "0.4.21"
 env_logger = "0.11.5"
 gpu-allocator = { version = "0.28.0" }
@@ -40,3 +41,6 @@ name = "buffer"
 
 [[example]]
 name = "egui"
+
+[[example]]
+name = "slang"

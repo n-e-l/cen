@@ -41,5 +41,6 @@ pub use self::surface::Surface;
 pub use self::swapchain::Swapchain;
 pub use self::pipeline::Pipeline;
 pub use self::pipeline::PipelineErr;
+pub use self::pipeline::SlangModule;
 pub use self::renderpass::RenderPass;
 pub use self::memory::GpuHandle;

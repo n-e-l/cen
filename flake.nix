@@ -44,6 +44,10 @@
 			spirv-tools
 			shaderc
             mesa # for lavapipe
+			shader-slang  
+
+			openssl
+			pkg-config
 
 			# Wayland
 			wayland
@@ -57,12 +61,18 @@
             pkgs.libxkbcommon
             pkgs.vulkan-loader
             pkgs.shaderc
+            pkgs.shader-slang
           ];
 
 		  shellHook = ''
+				export VULKAN_SDK="${pkgs.vulkan-loader}"
 				export VK_LAYER_PATH="${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d"
 				export LD_LIBRARY_PATH="${pkgs.wayland}/lib:${pkgs.libxkbcommon}/lib:${pkgs.vulkan-loader}/lib:$LD_LIBRARY_PATH"
                 export SHADERC_LIB_DIR="${pkgs.shaderc.lib}/lib"
+				export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
+				export SLANG_LIB_DIR="${pkgs.shader-slang}/lib"
+				export SLANG_INCLUDE_DIR="${pkgs.shader-slang.dev}/include"
+				export BINDGEN_EXTRA_CLANG_ARGS="-isystem ${pkgs.glibc.dev}/include"
           '';
 
           # Environment variables
