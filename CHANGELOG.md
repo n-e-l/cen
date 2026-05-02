@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.11](https://github.com/n-e-l/cen/compare/v0.0.10...v0.0.11) - 2026-05-02
+
+### Other
+
+- Add slang support
+- Add image context tests
+- Add command buffer submit test
+- Fix warning
+- Add logical device test
+- Add physical device test
+- Rename test
+- ICD path fix
+- Debug vulkan pipeline
+- Extra install lavapipe option
+- Update Install Vulkan SDK action
+- Disable headless surface extension
+- Add lavapipe instance test
+- Improve ergonomics
+- Fix warnings
+- Simplify image creation
+- Simplify transitions
+- Reorganize code
+- Rename resource store
+- Cargo fix
+- Move swapchain resize logic out of gui
+- Initial working image indirection
+- Use a texture handle
+- Cleanup
+- Cargo fix
+- Remove widget
+- Add window event callback and image flags
+- Simplify the component registry and remove Arc Mutexes
+- Update Vulkan SDK action version to v1.4.0
+- Actions version
+- Add texture lifetime management
+- Fix warnings
+- Too big of a commit, remove dynamic images for ImageTraits, consolidate pipeline configs, remove mutex from pipeline_store
+- Clean up pipeline store, as it doesn't need an Arc
+- Don't use 'q' for exiting
+- Proper swapchain barriers
+- Always render with the swapchain format
+- Add title option
+- Ease of use fixes
+- Move struct definition together
+- Fix warnings
+- More cleanup
+- Cleanup
+- Add initial support for dynamic images
+- Use correct egui_dock version
+- Add egui_dock
+- Disable tracing::span logs
+- Add pipeline update functionality
+- Add support for shader includes
+- Update egui to 0.32.2
+- Merge pull request #24 from n-e-l/release-plz-2025-10-17T20-19-07Z
+- Add guihandler and fix shaderc flake
+
 ## [0.0.10](https://github.com/n-e-l/cen/compare/v0.0.9...v0.0.10) - 2025-10-17
 
 ### Other
