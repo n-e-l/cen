@@ -87,14 +87,16 @@ pub fn load_slang_shader_code(source_file: PathBuf, modules: &[SlangModule]) -> 
         .ok_or_else(|| PipelineErr::ShaderCompilation("Entry point 'main' not found".into()))?;
 
     let mut components: Vec<slang::ComponentType> = vec![
-        host_module.into(),
-        entry_point.into(),
+        host_module.into()
     ];
     components.extend(user_components);
+    components.push(entry_point.into());
 
-    let linked = session
+    let composite = session
         .create_composite_component_type(&components)
-        .map_err(|e| PipelineErr::ShaderCompilation(format!("{}", e)))?
+        .map_err(|e| PipelineErr::ShaderCompilation(format!("{}", e)))?;
+
+    let linked = composite
         .link()
         .map_err(|e| PipelineErr::ShaderCompilation(format!("{}", e)))?;
 
