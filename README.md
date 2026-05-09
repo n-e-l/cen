@@ -6,12 +6,15 @@ A lightweight vulkan window backend using [ash](https://github.com/ash-rs/ash).
 
 Cen aims to provide abstractions around Vulkan handles and window management. Current features include:
 - Winit-backed window setup
-- Vulkan wrappers with memory dependencies
+- Vulkan wrappers with shared memory tracking
 - Hot-swappable shader storage, compiled at runtime
+- GLSL and [Slang](https://github.com/shader-slang/slang/) shader support
+- Built-in `egui` support
+- Image handles with automatic `egui` texture management
 
 ## Building & running
 
-Make sure you have the [Vulkan SDK](https://vulkan.lunarg.com) installed.  
+Make sure you have the [Vulkan SDK](https://vulkan.lunarg.com) installed. This has to be a more recent version with Slang support.
 Then build and run `cen` examples:
 ```
 git clone https://github.com/angelocarly/cen.git
@@ -22,7 +25,8 @@ cargo run --example basic
 ## GPU debugging
 
 ### Windows & Linux
-Renderdoc!
+- [Renderdoc](https://renderdoc.org)
+- Show me more :)
 
 ### Mac
 Mac only has XCode's Metal debugger. In order to use it you need to provide the following environment variables:
@@ -39,10 +43,4 @@ Then you should be able to launch your cen application and capture a frame.
 ## References
 - [myndgera](https://github.com/pudnax/myndgera) - Pipeline caching and reloading
 - [paya](https://github.com/paratym/paya) - Vulkan memory dependencies and ash wrappers
-
-## Libraries
-- [ash](https://github.com/ash-rs/ash) - Vulkan bindings
-- [winit](https://github.com/rust-windowing/winit) - Window creation and handling
-- [shaderc](https://github.com/google/shaderc-rs) - Shader compilation
-- [gpu-allocator](https://github.com/Traverse-Research/gpu-allocator?tab=readme-ov-file) - Memory management
-- [notify](https://github.com/notify-rs/notify) - File watching
+- 
