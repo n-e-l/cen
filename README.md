@@ -30,7 +30,7 @@ cargo run --example basic
 
 ### Windows & Linux
 - [Renderdoc](https://renderdoc.org)
-- Show me more :)
+- Let me know about others!
 
 ### Mac
 Mac only has XCode's Metal debugger. In order to use it you need to provide the following environment variables:
@@ -47,4 +47,3 @@ Then you should be able to launch your cen application and capture a frame.
 ## References
 - [myndgera](https://github.com/pudnax/myndgera) - Pipeline caching and reloading
 - [paya](https://github.com/paratym/paya) - Vulkan memory dependencies and ash wrappers
-- 
