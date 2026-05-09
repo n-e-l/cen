@@ -12,6 +12,10 @@ Cen aims to provide abstractions around Vulkan handles and window management. Cu
 - Built-in `egui` support
 - Image handles with automatic `egui` texture management
 
+Vulkan features used
+- Push descriptors
+- Dynamic rendering
+
 ## Building & running
 
 Make sure you have the [Vulkan SDK](https://vulkan.lunarg.com) installed. This has to be a more recent version with Slang support.
